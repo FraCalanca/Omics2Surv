@@ -29,5 +29,5 @@ Imports:
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
-URL: https://github.com/FraCalanca/Omics2Surv
+URL: https://github.com/FraCalanca/Omics2Surv, https://fracalanca.github.io/Omics2Surv/
 BugReports: https://github.com/FraCalanca/Omics2Surv/issues
