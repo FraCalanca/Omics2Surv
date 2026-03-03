@@ -8,56 +8,107 @@ output: github_document
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
-  fig.path = "man/figures/README-",
+  fig.path = "man/figures",
   out.width = "100%"
 )
 ```
 
-# Omics2Surv
+<p align="center">
+
+<img src="man/figures/logo.png" width="200"/>
+
+</p>
+
+<h1 align="center">
+
+Omics2Surv
+
+</h1>
+
+<p align="center">
+
+Integrative survival analysis for multi-omics data
+
+</p>
 
 <!-- badges: start -->
 
 <!-- badges: end -->
 
-**Omics2Surv** is an R package for **survival analysis with multi-omics data**.
+**Omics2Surv** is an R package for **survival analysis with high-dimensional multi-omics data**.\
+
+It provides a unified and extensible framework to **fit, integrate, and compare survival models**\
+
+across different omics layers under multiple integration paradigms.
 
 ## 📦 Package overview
 
-**Omics2Surv** is designed to:
+**Omics2Surv** key features:
 
--   Handle heterogeneous multi-omics datasets
+📥 Support for heterogeneous multi-omics data
 
--   Support multiple integration strategies:
+🔗 Multiple data integration strategies:
 
-\- None (single-omics modeling)
+```         
+Single-omics modeling
 
-\- Early integration
+Early integration
 
-\- Late integration
+Late integration
 
-\- Joint / cooperative models
+Joint integration
+```
 
--   Store all data in a standardized MultiAssayExperiment objects
+🍔 Standardized data handling via `MultiAssayExperiment`
 
--   Enable fair model comparison using concordance index (C-index)
+📊 Unified performance evaluation
 
-## Supported modeling strategies
+🔁 Fair and reproducible model comparison
 
-1.  **Single-omics, early and late integration** models:
+📉 Classical, machine learning, and deep learning survival models
 
--   Cox LASSO
--   Cox Elastic Net
--   Cox Adaptive LASSO
--   Penalized AFT models
+## 🔀 Analysis workflow
 
-2.  **Joint integration** models:
+<p align="center">
 
--   CoopCox (Cooperative Cox regression)
--   AFTCoop (Cooperative AFT regression)
--   blockForest (Random Forest)
--   flexynesis (Python-based deep learning survival framework)
+<img src="man/figures/workflow.png" width="850"/>
 
-## Installation
+</p>
+
+**Omics2Surv** follows a modular workflow: 1. Multi-omics input data 2. Harmonization and preprocessing 3. Integration strategy selection 4. Survival model fitting 5. Performance evaluation 6. Patient Assessment 7. Visualization
+
+## 📉 Supported modeling strategies
+
+### Single-omics, early and late integration
+
+-   **Cox LASSO / Elastic Net / Adaptive LASSO**\
+    Penalized Cox models for high-dimensional omics data.
+
+-   **Penalized AFT models**\
+    Accelerated Failure Time models with regularization.
+
+### Joint integration models
+
+-   **CoopCox / AFTCoop**\
+    Cooperative regression models that encourage agreement across omics layers.
+
+-   **blockForest**\
+    Random Forests adapted for grouped multi-omics predictors.
+
+-   **flexynesis**\
+    Deep learning–based survival models implemented via Python backend.
+
+| Method | Reference |
+|----|----|
+| Cox LASSO / Elastic Net | [Noah Simon et al. (2011)](https://doi.org/10.18637/jss.v039.i05) |
+| Cox Adaptive LASSO | [Hao Helen Zhang , Wenbin Lu (2007)](https://doi.org/10.1093/biomet/asm037) |
+| Penalized AFT | [Piotr M. Suder, Aaron J. Molstad (2022)](https://doi.org/10.1002/sim.9264) |
+| CoopCox | [Georg Hahn et al. (2024)](https://doi.org/10.1093/bib/bbae267) |
+| AFTCoop | Angelini et al. (2025) |
+| blockForest | [Roman Hornung, Marvin N. Wright (2019)](https://doi.org/10.1186/s12859-019-2942-y) |
+| flexynesis | [Bora Uyar et al. (2025)](https://doi.org/10.1038/s41467-025-63688-5) |
+
+## ⚙️ Installation
 
 You can install **Omics2Surv** from GitHub:
 
@@ -65,6 +116,10 @@ You can install **Omics2Surv** from GitHub:
 # install.packages("devtools")
 devtools::install_github("FraCalanca/Omics2Surv")
 ```
+
+## 📚 Documentation
+
+Function reference are available on the package website
 
 ## 🏛 Funding
 
