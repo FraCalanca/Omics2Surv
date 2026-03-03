@@ -1,4 +1,18 @@
 url: https://fracalanca.github.io/Omics2Surv/
 template:
   bootstrap: 5
+  bootswatch: minty
+  theme: github-light
+  params:
+    logo: man/figures/logo.png
+navbar:
+  structure:
+    left:
+    - home
+    - reference
+    - articles
+    right: github
+home:
+  title: Omics2Surv
+  description: Integrative survival analysis for multi-omics data
 
