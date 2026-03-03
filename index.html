@@ -5,21 +5,21 @@
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<title>What the Package Does (One Line, Title Case) • Omics2Surv</title>
+<title>Omics2Surv • Omics2Surv</title>
 <script src="deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <link href="deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet">
 <script src="deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
-<script src="deps/headroom-0.11.0/headroom.min.js"></script><script src="deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="deps/search-1.0.0/fuse.min.js"></script><script src="deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="pkgdown.js"></script><meta property="og:title" content="What the Package Does (One Line, Title Case)">
-<meta name="description" content="What the package does (one paragraph).">
-<meta property="og:description" content="What the package does (one paragraph).">
+<script src="deps/headroom-0.11.0/headroom.min.js"></script><script src="deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="deps/search-1.0.0/fuse.min.js"></script><script src="deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="pkgdown.js"></script><meta property="og:title" content="Omics2Surv">
+<meta name="description" content="Integrative survival analysis for multi-omics data">
+<meta property="og:description" content="Integrative survival analysis for multi-omics data">
 <meta property="og:image" content="https://fracalanca.github.io/Omics2Surv/logo.png">
 </head>
 <body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
-    <nav class="navbar navbar-expand-lg fixed-top bg-light" data-bs-theme="light" aria-label="Site navigation"><div class="container">
+    <nav class="navbar navbar-expand-lg fixed-top bg-primary" data-bs-theme="dark" aria-label="Site navigation"><div class="container">
 
     <a class="navbar-brand me-2" href="index.html">Omics2Surv</a>
 
@@ -35,9 +35,6 @@
 <li class="nav-item"><a class="nav-link" href="reference/index.html">Reference</a></li>
       </ul>
 <ul class="navbar-nav">
-<li class="nav-item"><form class="form-inline" role="search">
- <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="search.json">
-</form></li>
 <li class="nav-item"><a class="external-link nav-link" href="https://github.com/FraCalanca/Omics2Surv/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
       </ul>
 </div>
@@ -46,69 +43,137 @@
   </div>
 </nav><div class="container template-home">
 <div class="row">
-  <main id="main" class="col-md-9"><div class="section level1">
+  <main id="main" class="col-md-9"><p align="center">
+</p>
+<p><img src="reference/figures/logo.png" width="200"></p>
+
 <div class="page-header">
-<img src="logo.png" class="logo" alt=""><h1 id="omics2surv">Omics2Surv<a class="anchor" aria-label="anchor" href="#omics2surv"></a>
+<img src="logo.png" class="logo" alt=""><h1 align="center">
 </h1>
 </div>
+<p>Omics2Surv</p>
+
+<p align="center">
+</p>
+<p>Integrative survival analysis for multi-omics data</p>
+
 <!-- badges: start -->
 <!-- badges: end -->
-<p><strong>Omics2Surv</strong> is an R package for <strong>survival analysis with multi-omics data</strong>.</p>
+<p><strong>Omics2Surv</strong> is an R package for <strong>survival analysis with high-dimensional multi-omics data</strong>.</p>
+<p>It provides a unified and extensible framework to <strong>fit, integrate, and compare survival models</strong></p>
+<p>across different omics layers under multiple integration paradigms.</p>
 <div class="section level2">
 <h2 id="id_-package-overview">📦 Package overview<a class="anchor" aria-label="anchor" href="#id_-package-overview"></a>
 </h2>
-<p><strong>Omics2Surv</strong> is designed to:</p>
-<ul>
-<li><p>Handle heterogeneous multi-omics datasets</p></li>
-<li><p>Support multiple integration strategies:</p></li>
-</ul>
-<p>- None (single-omics modeling)</p>
-<p>- Early integration</p>
-<p>- Late integration</p>
-<p>- Joint / cooperative models</p>
-<ul>
-<li><p>Store all data in a standardized MultiAssayExperiment objects</p></li>
-<li><p>Enable fair model comparison using concordance index (C-index)</p></li>
-</ul>
+<p><strong>Omics2Surv</strong> key features:</p>
+<p>📥 Support for heterogeneous multi-omics data</p>
+<p>🔗 Multiple data integration strategies:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode R"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a>Single<span class="sc">-</span>omics modeling</span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a>Early integration</span>
+<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a></span>
+<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a>Late integration</span>
+<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a></span>
+<span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a>Joint integration</span></code></pre></div>
+<p>🍔 Standardized data handling via <code>MultiAssayExperiment</code></p>
+<p>📊 Unified performance evaluation</p>
+<p>🔁 Fair and reproducible model comparison</p>
+<p>📉 Classical, machine learning, and deep learning survival models</p>
 </div>
 <div class="section level2">
-<h2 id="supported-modeling-strategies">Supported modeling strategies<a class="anchor" aria-label="anchor" href="#supported-modeling-strategies"></a>
+<h2 id="id_-analysis-workflow">🔀 Analysis workflow<a class="anchor" aria-label="anchor" href="#id_-analysis-workflow"></a>
 </h2>
-<ol style="list-style-type: decimal">
-<li>
-<strong>Single-omics, early and late integration</strong> models:</li>
-</ol>
-<ul>
-<li>Cox LASSO</li>
-<li>Cox Elastic Net</li>
-<li>Cox Adaptive LASSO</li>
-<li>Penalized AFT models</li>
-</ul>
-<ol start="2" style="list-style-type: decimal">
-<li>
-<strong>Joint integration</strong> models:</li>
-</ol>
-<ul>
-<li>CoopCox (Cooperative Cox regression)</li>
-<li>AFTCoop (Cooperative AFT regression)</li>
-<li>blockForest (Random Forest)</li>
-<li>flexynesis (Python-based deep learning survival framework)</li>
-</ul>
+<p align="center">
+</p>
+<p><img src="reference/figures/workflow.png" width="850"></p>
+
+<p><strong>Omics2Surv</strong> follows a modular workflow: 1. Multi-omics input data 2. Harmonization and preprocessing 3. Integration strategy selection 4. Survival model fitting 5. Performance evaluation 6. Patient Assessment 7. Visualization</p>
 </div>
 <div class="section level2">
-<h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
+<h2 id="id_-supported-modeling-strategies">📉 Supported modeling strategies<a class="anchor" aria-label="anchor" href="#id_-supported-modeling-strategies"></a>
+</h2>
+<div class="section level3">
+<h3 id="single-omics-early-and-late-integration">Single-omics, early and late integration<a class="anchor" aria-label="anchor" href="#single-omics-early-and-late-integration"></a>
+</h3>
+<ul>
+<li><p><strong>Cox LASSO / Elastic Net / Adaptive LASSO</strong><br>
+Penalized Cox models for high-dimensional omics data.</p></li>
+<li><p><strong>Penalized AFT models</strong><br>
+Accelerated Failure Time models with regularization.</p></li>
+</ul>
+</div>
+<div class="section level3">
+<h3 id="joint-integration-models">Joint integration models<a class="anchor" aria-label="anchor" href="#joint-integration-models"></a>
+</h3>
+<ul>
+<li><p><strong>CoopCox / AFTCoop</strong><br>
+Cooperative regression models that encourage agreement across omics layers.</p></li>
+<li><p><strong>blockForest</strong><br>
+Random Forests adapted for grouped multi-omics predictors.</p></li>
+<li><p><strong>flexynesis</strong><br>
+Deep learning–based survival models implemented via Python backend.</p></li>
+</ul>
+<table class="table">
+<colgroup>
+<col width="50%">
+<col width="50%">
+</colgroup>
+<thead><tr class="header">
+<th>Method</th>
+<th>Reference</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td>Cox LASSO / Elastic Net</td>
+<td><a href="https://doi.org/10.18637/jss.v039.i05" class="external-link">Noah Simon et al. (2011)</a></td>
+</tr>
+<tr class="even">
+<td>Cox Adaptive LASSO</td>
+<td><a href="https://doi.org/10.1093/biomet/asm037" class="external-link">Hao Helen Zhang , Wenbin Lu (2007)</a></td>
+</tr>
+<tr class="odd">
+<td>Penalized AFT</td>
+<td><a href="https://doi.org/10.1002/sim.9264" class="external-link">Piotr M. Suder, Aaron J. Molstad (2022)</a></td>
+</tr>
+<tr class="even">
+<td>CoopCox</td>
+<td><a href="https://doi.org/10.1093/bib/bbae267" class="external-link">Georg Hahn et al. (2024)</a></td>
+</tr>
+<tr class="odd">
+<td>AFTCoop</td>
+<td>Angelini et al. (2025)</td>
+</tr>
+<tr class="even">
+<td>blockForest</td>
+<td><a href="https://doi.org/10.1186/s12859-019-2942-y" class="external-link">Roman Hornung, Marvin N. Wright (2019)</a></td>
+</tr>
+<tr class="odd">
+<td>flexynesis</td>
+<td><a href="https://doi.org/10.1038/s41467-025-63688-5" class="external-link">Bora Uyar et al. (2025)</a></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="section level2">
+<h2 id="id_️-installation">⚙️ Installation<a class="anchor" aria-label="anchor" href="#id_%EF%B8%8F-installation"></a>
 </h2>
 <p>You can install <strong>Omics2Surv</strong> from GitHub:</p>
-<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># install.packages("devtools")</span></span>
 <span><span class="fu">devtools</span><span class="fu">::</span><span class="fu">install_github</span><span class="op">(</span><span class="st">"FraCalanca/Omics2Surv"</span><span class="op">)</span></span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="id_-documentation">📚 Documentation<a class="anchor" aria-label="anchor" href="#id_-documentation"></a>
+</h2>
+<p>Function reference are available on the package website</p>
 </div>
 <div class="section level2">
 <h2 id="id_-funding">🏛 Funding<a class="anchor" aria-label="anchor" href="#id_-funding"></a>
 </h2>
 <p>This work is supported by the PRIN 2022 PNRR P2022BLN38 project, Computational approaches for the integration of multi-omics data funded by European Union - Next Generation EU, CUP B53D23027810001.</p>
 </div>
-</div>
+
   </main><aside class="col-md-3"><div class="links">
 <h2 data-toc-skip>Links</h2>
 <ul class="list-unstyled">
