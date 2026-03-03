@@ -1,11 +1,10 @@
 Package: Omics2Surv
-Title: What the Package Does (One Line, Title Case)
+Title: Integrative survival analysis for multi-omics data
 Version: 0.0.0.9000
 Authors@R: 
-    person("First", "Last", , "first.last@example.com", role = c("aut", "cre"))
-Description: What the package does (one paragraph).
-License: `use_mit_license()`, `use_gpl3_license()` or friends to pick a
-    license
+    person("Francesca", "Calanca", , "francescacalanca@cnr.it", role = c("aut", "cre"))
+Description: Omics2Surv is an R package for survival analysis with high-dimensional multi-omics data.
+License:
 Imports: 
     BiocParallel,
     blockForest,
@@ -25,7 +24,8 @@ Imports:
     SummarizedExperiment,
     survival,
     TCGAbiolinks,
-    tibble
+    tibble,
+    AFTCoop
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
