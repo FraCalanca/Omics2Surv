@@ -1,8 +1,11 @@
 Package: Omics2Surv
 Title: Integrative survival analysis for multi-omics data
-Version: 0.0.0.9000
-Authors@R: 
-    person("Francesca", "Calanca", , "francescacalanca@cnr.it", role = c("aut", "cre"))
+Version: 0.0.1
+Authors@R: c(
+    person("Francesca", "Calanca",
+    email= "francescacalanca@cnr.it", 
+    role = c("aut", "cre")),
+    comment = c(ORCID= "0009-0008-6381-1763"))
 Description: Omics2Surv is an R package for survival analysis with high-dimensional multi-omics data.
 License:
 Imports: 
