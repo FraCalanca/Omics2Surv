@@ -4,8 +4,13 @@ Version: 0.0.1
 Authors@R: c(
     person("Francesca", "Calanca",
     email= "francescacalanca@cnr.it", 
-    role = c("aut", "cre")),
-    comment = c(ORCID= "0009-0008-6381-1763"))
+    role = c("aut", "cre"),
+    comment = c(ORCID= "0009-0008-6381-1763")),
+    person("Andrea","Raiconi",
+    role=c("aut")),
+    person("Claudia", "Angelini", 
+    role = c("aut"))
+    )
 Description: Omics2Surv is an R package for survival analysis with high-dimensional multi-omics data.
 License:
 Imports: 
