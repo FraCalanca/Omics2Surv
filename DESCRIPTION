@@ -32,8 +32,9 @@ Imports:
     SummarizedExperiment,
     survival,
     TCGAbiolinks,
-    tibble,
-    AFTCoop
+    tibble
+Remotes: 
+  angeclau/AFTCoop
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
