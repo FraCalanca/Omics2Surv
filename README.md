@@ -59,14 +59,14 @@ across different omics layers under multiple integration paradigms.
 
 <p align="center">
 
-<img src="man/figures/workflow.png" width="850"/>
+<img src="man/figures/Workflow.png" width="850"/>
 
 </p>
 
-**Omics2Surv** follows a modular workflow: 1. Multi-omics input data 2.
-Harmonization and preprocessing 3. Integration strategy selection 4.
-Survival model fitting 5. Performance evaluation 6. Patient Assessment
-7. Visualization
+**Omics2Surv** follows a modular workflow: 1. Multi-omics and survival input data 2. Data exploration
+3. Variable screening and harmonization 4. Integration strategy selection 5.
+Survival model fitting 6. Marker identification 7. Patient Assessment
+8. Disease understanding
 
 ## 📉 Supported modeling strategies
 
@@ -96,7 +96,7 @@ Survival model fitting 5. Performance evaluation 6. Patient Assessment
 | Cox Adaptive LASSO | [Hao Helen Zhang , Wenbin Lu (2007)](https://doi.org/10.1093/biomet/asm037) |
 | Penalized AFT | [Piotr M. Suder, Aaron J. Molstad (2022)](https://doi.org/10.1002/sim.9264) |
 | CoopCox | [Georg Hahn et al. (2024)](https://doi.org/10.1093/bib/bbae267) |
-| AFTCoop | Angelini et al. (2025) |
+| AFTCoop | Angelini et al. (submitted) |
 | blockForest | [Roman Hornung, Marvin N. Wright (2019)](https://doi.org/10.1186/s12859-019-2942-y) |
 | flexynesis | [Bora Uyar et al. (2025)](https://doi.org/10.1038/s41467-025-63688-5) |
 
@@ -111,10 +111,10 @@ devtools::install_github("FraCalanca/Omics2Surv")
 
 ## 📚 Documentation
 
-Function reference are available on the package website
+Function references are available on the package website.
 
 ## 🏛 Funding
 
 This work is supported by the PRIN 2022 PNRR P2022BLN38
 project, Computational approaches for the integration of multi-omics
-data funded by European Union - Next Generation EU, CUP B53D23027810001.
+data funded by the European Union - Next Generation EU, CUP B53D23027810001.
