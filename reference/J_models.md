@@ -143,6 +143,7 @@ Each joint method has specific requirements:
 
 Results are stored hierarchically in the MAE metadata:
 
+
     metadata(mae)
       └─ analysis
          └─ cooperative

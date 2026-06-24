@@ -131,6 +131,7 @@ Integration Methods
 
 Result OrganizationResults are stored hierarchically:
 
+
     metadata(mae)
       └─ analysis
          ├─ [model]                     # Individual omics results

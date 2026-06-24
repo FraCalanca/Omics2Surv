@@ -71,21 +71,22 @@ Survival model fitting 5. Performance evaluation 6. Patient Assessment
 - **flexynesis**  
   Deep learning–based survival models implemented via Python backend.
 
-| Method                  | Reference                                                                           |
-|-------------------------|-------------------------------------------------------------------------------------|
-| Cox LASSO / Elastic Net | [Noah Simon et al. (2011)](https://doi.org/10.18637/jss.v039.i05)                   |
-| Cox Adaptive LASSO      | [Hao Helen Zhang , Wenbin Lu (2007)](https://doi.org/10.1093/biomet/asm037)         |
-| Penalized AFT           | [Piotr M. Suder, Aaron J. Molstad (2022)](https://doi.org/10.1002/sim.9264)         |
-| CoopCox                 | [Georg Hahn et al. (2024)](https://doi.org/10.1093/bib/bbae267)                     |
-| AFTCoop                 | Angelini et al. (2025)                                                              |
-| blockForest             | [Roman Hornung, Marvin N. Wright (2019)](https://doi.org/10.1186/s12859-019-2942-y) |
-| flexynesis              | [Bora Uyar et al. (2025)](https://doi.org/10.1038/s41467-025-63688-5)               |
+| Method | Reference |
+|----|----|
+| Cox LASSO / Elastic Net | [Noah Simon et al. (2011)](https://doi.org/10.18637/jss.v039.i05) |
+| Cox Adaptive LASSO | [Hao Helen Zhang , Wenbin Lu (2007)](https://doi.org/10.1093/biomet/asm037) |
+| Penalized AFT | [Piotr M. Suder, Aaron J. Molstad (2022)](https://doi.org/10.1002/sim.9264) |
+| CoopCox | [Georg Hahn et al. (2024)](https://doi.org/10.1093/bib/bbae267) |
+| AFTCoop | Angelini et al. (2025) |
+| blockForest | [Roman Hornung, Marvin N. Wright (2019)](https://doi.org/10.1186/s12859-019-2942-y) |
+| flexynesis | [Bora Uyar et al. (2025)](https://doi.org/10.1038/s41467-025-63688-5) |
 
 ## ⚙️ Installation
 
 You can install **Omics2Surv** from GitHub:
 
 ``` r
+
 # install.packages("devtools")
 devtools::install_github("FraCalanca/Omics2Surv")
 ```
