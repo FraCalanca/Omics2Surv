@@ -4,46 +4,24 @@
 \alias{test_blockForest}
 \title{Test Block Random Forest Model}
 \usage{
-test_blockForest(x_test, y_test, training_result, num_threads = 10)
+test_blockForest(X_list, training_result, threads = 10)
 }
 \arguments{
-\item{x_test}{A matrix or data frame of test predictors. Must have the same
-features (columns) as \code{x_training} used in training, including matching
-column names and prefixes.}
+\item{X_list}{Named list of omics matrices (samples x features) for the
+test set. Names must match those used in training. Column names will be
+prefixed automatically as in training.}
 
-\item{y_test}{A data frame containing test survival outcomes with columns:
-\itemize{
-\item \code{overall_survival}: Numeric survival time
-\item \code{status}: Numeric event indicator (1 = event, 0 = censored)
-}}
+\item{training_result}{List returned by \code{\link{train_blockForest}}.}
 
-\item{training_result}{A list object returned by \code{\link{train_blockForest}}
-containing the trained model and associated parameters. Note: The function
-expects \code{training_result$model_BF}, but \code{train_blockForest} returns
-\code{training_result$model}. Ensure compatibility or adjust accordingly.}
-
-\item{num_threads}{Integer specifying the number of parallel threads to use for
-prediction. Default is 10.}
+\item{threads}{Integer number of parallel threads. Default is 10.}
 }
 \value{
-A list containing:
-\item{pred}{Numeric vector of linear predictors (risk scores) for test samples,
-extracted from the final column of the cumulative hazard function (CHF).
-Higher values indicate higher risk (shorter predicted survival).}
-\item{cindex}{Numeric concordance index (C-index) on test data. Values range from
-0 to 1, where 0.5 indicates random predictions and 1.0 indicates perfect concordance.
-Calculated with \code{reverse = TRUE} to account for risk score directionality.}
+A list with \code{pred}: numeric vector of risk scores.
 }
 \description{
-Evaluates a trained block random forest model on test data by generating risk
-predictions and calculating the concordance index.
+Applies a trained block random forest model to new data. Can be called
+directly or via \code{\link{predict_j_models}}.
 }
-\details{
-This function applies the trained block random forest model to new test data:
-\enumerate{
-\item Prepares test data in the same format as training data
-\item Generates predictions using the trained model
-\item Extracts risk scores from the cumulative hazard function (CHF)
-\item Calculates the concordance index to evaluate prediction accuracy
-}
+\seealso{
+\code{\link{train_blockForest}}, \code{\link{predict_j_models}}
 }

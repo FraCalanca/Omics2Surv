@@ -4,64 +4,26 @@
 \alias{test_cooplearning}
 \title{Test Cooperative Learning Model}
 \usage{
-test_cooplearning(X_list_test, y_test, training_result)
+test_cooplearning(X_list_test, training_result)
 }
 \arguments{
-\item{X_list_test}{A named list of omics data matrices or data frames for testing.
-Must contain the same omics layers (in the same order and with matching feature names)
-as used in training. Each element should have:
-\itemize{
-\item Samples as rows with matching row names across all omics layers
-\item Features as columns, matching those in the training data
-}}
+\item{X_list_test}{Named list of omics matrices (samples x features) for
+the test set. Must have the same omics layers and features, in the same
+order, as training.}
 
-\item{y_test}{A data frame containing test survival outcomes with:
-\itemize{
-\item Row names matching sample identifiers in \code{X_list_test}
-\item Column \code{overall_survival}: Numeric survival time
-\item Column \code{status}: Numeric event indicator (1 = event, 0 = censored)
-}}
-
-\item{training_result}{A list object returned by \code{\link{train_cooplearning}}
-containing the trained model and coefficients.}
+\item{training_result}{List returned by \code{\link{train_cooplearning}}.}
 }
 \value{
-A list containing:
-\item{pred}{Numeric vector of risk scores for test samples. Higher values indicate
-higher risk (shorter predicted survival). Calculated as the linear combination
-of features weighted by learned coefficients.}
-\item{cindex}{Numeric concordance index (C-index) on test data. Values range from
-0 to 1, where 0.5 indicates random predictions and 1.0 indicates perfect concordance.
-Calculated with \code{reverse = TRUE} to account for risk score directionality.}
+A list with \code{pred}: named numeric vector of risk scores.
 }
 \description{
-Evaluates a trained cooperative learning model on test data by generating risk
-predictions and calculating the concordance index.
+Applies a trained CoopCox model to new data. Can be called directly or
+via \code{\link{predict_j_models}}.
 }
 \details{
-This function applies the trained cooperative learning model to new test data:
-\enumerate{
-\item Validates that \code{X_list_test} is a list
-\item Aligns test samples across all omics layers using common identifiers
-\item Combines all omics layers into a single feature matrix
-\item Ensures feature names match the training model
-\item Computes risk scores as a weighted sum: \code{X_test \%*\% coefficients}
-\item Calculates C-index to evaluate prediction performance
+Omics layers and features are assumed to be in the same order as in
+training.
 }
-
-The C-index measures the model's discriminative ability—the probability that,
-for a randomly selected pair of patients, the model correctly ranks which patient
-will experience the event first.
-}
-\section{Data Requirements}{
-
-\itemize{
-\item Test omics layers must match training layers in number, order, and features
-\item Only samples present in all test omics layers are used
-\item Feature names must be consistent with training data
-}
-}
-
 \seealso{
-\code{\link{train_cooplearning}} for training the model
+\code{\link{train_cooplearning}}, \code{\link{predict_j_models}}
 }

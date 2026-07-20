@@ -1,0 +1,422 @@
+---
+title: "Multi-omics survival analysis"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Multi-omics survival analysis}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment  = "#>",
+  eval     = FALSE
+)
+```
+
+```{r setup}
+library(Omics2Surv)
+```
+
+## Introduction
+
+This vignette walks through a complete **multi-omics** survival analysis
+workflow, from data acquisition to patient stratification and functional
+enrichment. As a working example we use the TCGA-KIPAN cohort (kidney
+pan-cancer), retrieving RNA-seq, copy number variation (CNV) and
+DNA methylation data together with the corresponding clinical information.
+
+While three omics layers are downloaded and assembled into a single
+`MultiAssayExperiment` (MAE), this vignette focuses on **combining multiple
+omics** (RNA-seq and Methylation), using early, late, and joint integration strategies. 
+For a workflow that models each omic independently, see the companion `vignette("single-omic-analysis")`.
+
+## Data acquisition & exploration
+
+We start by retrieving the omics and clinical data from LinkedOmics for the
+TCGA-KIPAN cohort.
+
+```{r}
+KIPANRNA_link = retrieve_linkedomics_data("TCGA-KIPAN","RNAseq (HiSeq, Gene level)")
+
+KIPANCN_link = retrieve_linkedomics_data("TCGA-KIPAN", "SCNV (Gene level, Thresholded)")
+
+KIPAN_Meth_link= retrieve_linkedomics_data("TCGA-KIPAN", "Methylation (Gene level, HM450K)")
+
+KIPANClin_link= retrieve_linkedomics_data("TCGA-KIPAN", "Clinical")
+```
+
+### Exploration
+
+Before any modeling step, it is good practice to explore the data structure.
+`explore_pca()` performs a principal component analysis on the RNA-seq data
+and relates the resulting components to a set of clinical/metadata variables.
+
+```{r}
+data_expl= explore_pca(KIPANRNA_link, KIPANClin_link, metavars = c("histological_type", "gender", "radiation_therapy", "race", "ethnicity"))
+
+data_expl$eigencorplot
+```
+
+## Data preselection
+
+### Optional splitting
+
+The cohort is split into a training and a test set. The same split is
+shared across all omics layers so that the same patients end up in the
+training set (and the same patients in the test set) for every modality.
+
+```{r}
+KIPAN_split <- split_train_test(
+  omics_list     = list(mRNA = KIPANRNA_link,
+                        CNV  = KIPANCN_link, methyl = KIPAN_Meth_link),
+  clinical_data  = KIPANClin_link
+)
+
+```
+
+### Variable screening
+
+Each omic is preprocessed and screened on the training set only, to avoid
+information leakage from the test set. Here RNA-seq features are selected in
+an unsupervised fashion based on highly variable genes, CNV features are
+selected based on sparsity, and methylation features are selected based on
+interquartile range (IQR).
+
+```{r}
+KIPAN_RNA_train=prepare_RNA(KIPAN_split$train_list$mRNA,   KIPAN_split$train_clinical,method = "unsupervised", unsupervised_method= "A", hvg_threshold = 5)
+KIPAN_CNV_train=prepare_CNV(KIPAN_split$train_list$CNV,   KIPAN_split$train_clinical,method = "unsupervised", unsupervised_method = "sparsity", top_n_features = 800)
+KIPAN_Meth_train=prepare_methyl(KIPAN_split$train_list$methyl,   KIPAN_split$train_clinical, method="unsupervised", unsupervised_method = "IQR", hvg_threshold = 5)
+```
+
+The same features selected on the training set are then applied to the test
+set with `prepare_test_SE()`, so that train and test share an identical
+feature space.
+
+```{r}
+KIPAN_RNA_test= prepare_test_SE(KIPAN_split$test_list$mRNA,   KIPAN_RNA_train)
+KIPAN_Meth_test= prepare_test_SE(KIPAN_split$test_list$methyl,  KIPAN_Meth_train)
+KIPAN_CNV_test= prepare_test_SE(KIPAN_split$test_list$CNV,   KIPAN_CNV_train)
+```
+
+```{r}
+omics_train = list(mRNA=KIPAN_RNA_train, CNV=KIPAN_CNV_train, meth= KIPAN_Meth_train)
+
+omics_test = list(mRNA= KIPAN_RNA_test, CNV= KIPAN_CNV_test, meth= KIPAN_Meth_test)
+```
+
+### MAE building with 3 omics
+
+The preprocessed omics and the clinical data are assembled into a
+`MultiAssayExperiment` object, separately for the training and the test set.
+
+```{r}
+KIPAN_MAE_train = build_MAE(omics_list = omics_train, KIPAN_split$train_clinical)
+
+KIPAN_MAE_test=build_MAE(omics_list = omics_test, KIPAN_split$test_clinical)
+```
+
+## Multi-omics modeling: RNA + Methylation
+
+From this point on we focus on combining the RNA-seq and methylation
+layers (`omic_list = c("mRNA", "meth")`) using several integration
+strategies.
+
+### Penalized regression - Early integration
+
+In early integration, the features from the different omics are
+concatenated before fitting a single penalized regression model.
+
+```{r}
+#lasso
+KIPAN_MAE_train <- train_pen_reg_models(
+  mae_train    = KIPAN_MAE_train,
+  omic_list    = c("mRNA", "meth"),
+  integration  = "early",
+  model_method = "cox_lasso",
+  nfolds = 10,
+  nlambda = 200
+)
+
+KIPAN_MAE_test <- predict_pen_reg_models(
+  mae_pred     = KIPAN_MAE_test,
+  mae_train    = KIPAN_MAE_train,
+  omic_list    = c("mRNA", "meth"),
+  integration  = "early",
+  model_method = "cox_lasso"
+)
+```
+
+```{r}
+#adaptive lasso
+KIPAN_MAE_train <- train_pen_reg_models(
+  mae_train    = KIPAN_MAE_train,
+  omic_list    = c("mRNA", "meth"),
+  integration  = "early",
+  model_method = "cox_adaptive_lasso",
+  nfolds = 10,
+  nlambda = 200
+)
+
+KIPAN_MAE_test <- predict_pen_reg_models(
+  mae_pred     = KIPAN_MAE_test,
+  mae_train    = KIPAN_MAE_train,
+  omic_list    = c("mRNA", "meth"),
+  integration  = "early",
+  model_method = "cox_adaptive_lasso"
+)
+```
+
+```{r}
+#elastic net
+KIPAN_MAE_train <- train_pen_reg_models(
+  mae_train    = KIPAN_MAE_train,
+  omic_list    = c("mRNA", "meth"),
+  integration  = "early",
+  model_method = "cox_elastic_net",
+  nfolds= 10,
+  nlambda = 200
+)
+
+KIPAN_MAE_test <- predict_pen_reg_models(
+  mae_pred     = KIPAN_MAE_test,
+  mae_train    = KIPAN_MAE_train,
+  omic_list    = c("mRNA", "meth"),
+  integration  = "early",
+  model_method = "cox_elastic_net"
+)
+```
+
+```{r}
+#aft pen
+KIPAN_MAE_train <- train_pen_reg_models(
+  mae_train    = KIPAN_MAE_train,
+  omic_list    = c("mRNA", "meth"),
+  integration  = "early",
+  model_method = "aft_pen",
+  nfolds = 10,
+  nlambda= 200
+)
+
+KIPAN_MAE_test <- predict_pen_reg_models(
+  mae_pred     = KIPAN_MAE_test,
+  mae_train    = KIPAN_MAE_train,
+  omic_list    = c("mRNA", "meth"),
+  integration  = "early",
+  model_method = "aft_pen"
+)
+```
+
+### Penalized regression - Late integration
+
+In late integration, a separate model is fitted on each omic and the
+resulting predictions are then combined. We used the Robust Rank Aggregation method.
+
+```{r}
+#lasso
+KIPAN_MAE_train <- train_pen_reg_models(
+  mae_train    = KIPAN_MAE_train,
+  omic_list    = c("mRNA", "meth"),
+  integration  = "late",
+  model_method = "cox_lasso"
+)
+
+KIPAN_MAE_test <- predict_pen_reg_models(
+  mae_pred     = KIPAN_MAE_test,
+  mae_train    = KIPAN_MAE_train,
+  omic_list    = c("mRNA", "meth"),
+  integration  = "late",
+  model_method = "cox_lasso"
+)
+```
+
+```{r}
+#adaptive lasso
+KIPAN_MAE_train <- train_pen_reg_models(
+  mae_train    = KIPAN_MAE_train,
+  omic_list    = c("mRNA", "meth"),
+  integration  = "late",
+  model_method = "cox_adaptive_lasso"
+)
+
+KIPAN_MAE_test <- predict_pen_reg_models(
+  mae_pred     = KIPAN_MAE_test,
+  mae_train    = KIPAN_MAE_train,
+  omic_list    = c("mRNA", "meth"),
+  integration  = "late",
+  model_method = "cox_adaptive_lasso"
+)
+```
+
+```{r}
+#elastic net
+KIPAN_MAE_train <- train_pen_reg_models(
+  mae_train    = KIPAN_MAE_train,
+  omic_list    = c("mRNA", "meth"),
+  integration  = "late",
+  model_method = "cox_elastic_net"
+)
+
+KIPAN_MAE_test <- predict_pen_reg_models(
+  mae_pred     = KIPAN_MAE_test,
+  mae_train    = KIPAN_MAE_train,
+  omic_list    = c("mRNA", "meth"),
+  integration  = "late",
+  model_method = "cox_elastic_net"
+)
+```
+
+```{r}
+#aft pen
+KIPAN_MAE_train <- train_pen_reg_models(
+  mae_train    = KIPAN_MAE_train,
+  omic_list    = c("mRNA", "meth"),
+  integration  = "late",
+  model_method = "aft_pen"
+)
+
+KIPAN_MAE_test <- predict_pen_reg_models(
+  mae_pred     = KIPAN_MAE_test,
+  mae_train    = KIPAN_MAE_train,
+  omic_list    = c("mRNA", "meth"),
+  integration  = "late",
+  model_method = "aft_pen"
+)
+```
+
+### Joint integration
+
+Joint integration methods model all omics simultaneously within a single
+algorithm. Here we use cooperative regularized Cox regression (`CoopCox`),
+a random-forest based approach for blockwise data (`blockForest`), and a
+cooperative AFT model (`AFTCoop`).
+
+```{r}
+KIPAN_MAE_train <- train_j_models(
+  mae_train    = KIPAN_MAE_train,
+  omic_list    = c("mRNA", "meth"),
+  joint_method = "CoopCox",
+  folds = 10,
+  seed = 8290
+)
+
+KIPAN_MAE_test <- predict_j_models(
+  mae_pred     = KIPAN_MAE_test,
+  mae_train    = KIPAN_MAE_train,
+  omic_list    = c("mRNA", "meth"),
+  joint_method = "CoopCox"
+)
+```
+
+```{r}
+KIPAN_MAE_train <- train_j_models(
+  mae_train    = KIPAN_MAE_train,
+  omic_list    = c("mRNA", "meth"),
+  joint_method = "blockForest",
+  seed = 8290
+)
+
+KIPAN_MAE_test <- predict_j_models(
+  mae_pred     = KIPAN_MAE_test,
+  mae_train    = KIPAN_MAE_train,
+  omic_list    = c("mRNA", "meth"),
+  joint_method = "blockForest"
+)
+```
+
+```{r}
+KIPAN_MAE_train <- train_j_models(
+  mae_train    = KIPAN_MAE_train,
+  omic_list    = c("mRNA", "meth"),
+  joint_method = "AFTCoop"
+)
+
+KIPAN_MAE_test <- predict_j_models(
+  mae_pred     = KIPAN_MAE_test,
+  mae_train    = KIPAN_MAE_train,
+  omic_list    = c("mRNA", "meth"),
+  joint_method = "AFTCoop"
+)
+```
+
+### Flexynesis
+
+Finally, we train a deep-learning based multi-omics model using
+[Flexynesis](https://github.com/BIMSBbioinfo/flexynesis).
+Flexynesis is a Python package, so before running the chunks below you
+need to set up a dedicated Python environment with Python >= 3.11 and
+install Flexynesis in it:
+
+```{bash, eval = FALSE}
+# requires mamba (https://mamba.readthedocs.io/en/latest/installation.html)
+mamba create --name flexynesisenv python==3.11
+mamba activate flexynesisenv
+
+# install the latest version from PyPI (https://pypi.org/project/flexynesis)
+python -m pip install flexynesis --upgrade
+```
+
+```{r}
+KIPAN_MAE_train <- train_flexynesis_models(
+  mae_train  = KIPAN_MAE_train,
+  omic_list  = c("mRNA", "meth"),
+  threads= 19 #change this to the number of threads available on your machine
+)
+
+KIPAN_MAE_test <- predict_flexynesis_models(
+  mae_pred   = KIPAN_MAE_test,
+  mae_train  = KIPAN_MAE_train,
+  omic_list  = c("mRNA", "meth")
+)
+```
+
+## C-index tables
+
+`benchmark_models()` collects the concordance index (C-index) achieved by
+every model trained so far and returns a comparison table. Here we restrict
+the comparison to the early, late, joint, and Flexynesis.
+
+```{r}
+KIPAN_table= benchmark_models(KIPAN_MAE_train, KIPAN_MAE_test,
+                 keep_integrations = c("early", "late", "joint", "flexynesis"))
+```
+
+## Patient stratification
+
+Using the risk scores from the best performing multi-omics model
+(`blockForest` in this example), patients can be stratified into risk
+groups and the results visualized with Kaplan-Meier curves, UMAP embeddings,
+and heatmaps.
+
+```{r}
+KIPAN_multi_strat <- patient_stratification(KIPAN_MAE_train, KIPAN_MAE_test,
+                                            model = "blockForest",
+                                            method = "survcutpoint",
+                                            plot_scores = TRUE)
+plot_km(KIPAN_multi_strat)
+plot_umap(KIPAN_MAE_test, KIPAN_multi_strat, model = "blockForest", mae_train = KIPAN_MAE_train, top_feat = 100)
+```
+
+```{r}
+plot_heatmap(KIPAN_MAE_test, KIPAN_multi_strat, model = "blockForest",
+             top_feat = 50, mae_train = KIPAN_MAE_train)
+```
+
+Finally, the user defined top features by model importance can be
+tested for functional enrichment.
+
+```{r}
+KIPAN_block <- enrich_features(KIPAN_MAE_train, model = "blockForest",
+                                  top_feat = 50,
+                                  strip_prefix = "^(mRNA|meth)_",
+                               pvalue_cutoff = 0.07,
+  qvalue_cutoff = 0.2)
+plot_enrichment(KIPAN_block, "GO")
+```
+
+## Session info
+
+```{r}
+sessionInfo()
+```

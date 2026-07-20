@@ -7,6 +7,7 @@
 train_cooplearning(
   X_list,
   y_training,
+  val_fraction = 0.1,
   lambdaVector = seq(0.1, 0.9, 0.1),
   folds = 5,
   alpha = 1,
@@ -15,64 +16,50 @@ train_cooplearning(
 )
 }
 \arguments{
-\item{X_list}{A named list of 2 or 3 omics data matrices or data frames. Each element
-represents a different omics layer (e.g., transcriptomics, proteomics, methylation).
-All matrices must have:
-\itemize{
-\item Samples as rows with matching row names across all omics layers
-\item Features as columns
-}}
+\item{X_list}{Named list of 2 or 3 omics matrices (samples x features).
+Row names must be sample identifiers, consistent across all layers.}
 
-\item{y_training}{A data frame containing survival outcomes with:
-\itemize{
-\item Row names matching sample identifiers in \code{X_list}
-\item Column \code{overall_survival}: Numeric survival time
-\item Column \code{status}: Numeric event indicator (1 = event, 0 = censored)
-}}
+\item{y_training}{Data frame with \code{overall_survival} and \code{status}
+columns. Row names must match sample identifiers in \code{X_list}.}
 
-\item{lambdaVector}{Numeric vector of lambda values to evaluate during cross-validation.
-Default is \code{seq(0.1, 0.9, 0.1)}. Lambda controls the strength of regularization.}
+\item{val_fraction}{Numeric proportion of training samples to hold out as
+internal validation for lambda selection. Default is \code{0.1}.}
 
-\item{folds}{Integer specifying the number of cross-validation folds for lambda selection.
-Default is 5.}
+\item{lambdaVector}{Numeric vector of lambda values to evaluate.
+Default is \code{seq(0.1, 0.9, 0.1)}.}
 
-\item{alpha}{Numeric value controlling the agreement between layers.
-\code{alpha = 1} for 2 layers, \code{alpha = 0.5} for 3 layers. Default is 1.}
+\item{folds}{Integer number of cross-validation folds. Default is 5.}
 
-\item{maxit}{Integer maximum number of iterations for the optimization algorithm.
-Default is 100.}
+\item{alpha}{Numeric cooperation parameter: 1 for 2 layers, 0.5 for 3.
+Default is 1.}
 
-\item{seed}{Integer seed for reproducibility of train/validation split and cross-validation.
-Default is 123.}
+\item{maxit}{Integer maximum iterations. Default is 1000.}
+
+\item{seed}{Integer seed. Default is 123.}
 }
 \value{
-A list containing:
-\item{model}{The trained cooplasso model object containing coefficient vector \code{b}
-and other model parameters.}
-\item{selected_lambda}{Numeric optimal lambda value selected through cross-validation.}
-\item{selected_features}{Character vector of feature names with non-zero coefficients
-(selected features across all omics layers).}
-\item{pred}{Numeric vector of risk scores for training samples. Higher values indicate
-higher risk (shorter predicted survival).}
-\item{cindex}{Numeric concordance index (C-index) on training data, calculated with
-\code{reverse = TRUE} to account for risk score directionality.}
-\item{omics}{Character vector of omics layer names from the input \code{X_list}.}
+A list with:
+\itemize{
+\item \code{model}: Trained cooplasso model.
+\item \code{selected_lambda}: Optimal lambda selected by CV.
+\item \code{selected_features}: Non-zero coefficient feature names.
+\item \code{pred}: Named numeric vector of risk scores for the full
+input set (train + internal validation reassembled in original order).
+\item \code{omics}: Names of omics layers used.
+}
 }
 \description{
-Trains a cooperative Lasso (CoopLasso) Cox regression model that integrates
-multiple omics datasets for survival prediction. The method encourages cooperation
-between different data modalities while performing feature selection through
-L1 regularization.
+Trains a cooperative Lasso Cox regression model integrating 2 or 3 omics
+layers. An internal validation subset is held out for lambda selection via
+cross-validation. Can be called directly or via \code{\link{train_j_models}}.
 }
-\details{
-The function performs the following workflow:
-\enumerate{
-\item Validates input structure (2 or 3 omics layers required)
-\item Aligns samples across all omics layers and survival data using common identifiers
-\item Splits data into training (90\\%) and validation (10\\%) sets
-\item Performs k-fold cross-validation to select optimal lambda parameter
-\item Trains final cooperative Lasso model with selected lambda
-\item Computes risk scores and C-index on training data
-\item Identifies selected features with non-zero coefficients
+\references{
+Hahn G, Prokopenko D, Hecker J, Lutz SM, Mullin K, Sejour L, Hide W,
+Vlachos I, DeSantis S, Tanzi RE, Lange C. Prediction of disease-free
+survival for precision medicine using cooperative learning on multi-omic
+data. \emph{Briefings in Bioinformatics}, 25(4):bbae267, July 2024.
+\doi{10.1093/bib/bbae267}
 }
+\seealso{
+\code{\link{test_cooplearning}}, \code{\link{train_j_models}}
 }

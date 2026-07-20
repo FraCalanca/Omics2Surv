@@ -92,13 +92,13 @@ Survival model fitting 6. Marker identification 7. Patient Assessment
 
 | Method | Reference |
 |----|----|
-| Cox LASSO / Elastic Net | [Noah Simon et al. (2011)](https://doi.org/10.18637/jss.v039.i05) |
+| Cox LASSO / Elastic Net | [Noah Simon et al. (2011)](https://doi.org/10.18637/jss.v039.i05) |
 | Cox Adaptive LASSO | [Hao Helen Zhang , Wenbin Lu (2007)](https://doi.org/10.1093/biomet/asm037) |
 | Penalized AFT | [Piotr M. Suder, Aaron J. Molstad (2022)](https://doi.org/10.1002/sim.9264) |
-| CoopCox | [Georg Hahn et al. (2024)](https://doi.org/10.1093/bib/bbae267) |
-| AFTCoop | Angelini et al. (submitted) |
+| CoopCox | [Georg Hahn et al. (2024)](https://doi.org/10.1093/bib/bbae267) |
+| AFTCoop | Angelini et al. (submitted) |
 | blockForest | [Roman Hornung, Marvin N. Wright (2019)](https://doi.org/10.1186/s12859-019-2942-y) |
-| flexynesis | [Bora Uyar et al. (2025)](https://doi.org/10.1038/s41467-025-63688-5) |
+| flexynesis | [Bora Uyar et al. (2025)](https://doi.org/10.1038/s41467-025-63688-5) |
 
 ## ⚙️ Installation
 
@@ -116,5 +116,5 @@ Function references are available on the package website.
 ## 🏛 Funding
 
 This work is supported by the PRIN 2022 PNRR P2022BLN38
-project, Computational approaches for the integration of multi-omics
-data funded by the European Union - Next Generation EU, CUP B53D23027810001.
+project, Computational approaches for the integration of multi-omics
+data funded by the European Union - Next Generation EU, CUP B53D23027810001.

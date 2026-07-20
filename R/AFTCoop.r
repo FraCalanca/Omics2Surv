@@ -1,190 +1,155 @@
 #' Train AFT Cooperative Learning Model
 #'
-#' Trains an Accelerated Failure Time (AFT) model using cooperative learning
-#' with two sets of predictors. The function fits a regularized survival model
-#' across multiple correlation (rho) values and returns coefficients, predictions,
-#' and performance metrics.
+#' Trains an Accelerated Failure Time cooperative learning model on exactly
+#' two omics layers. Called internally by \code{\link{train_j_models}}.
 #'
-#' @param x_training1 A matrix or data frame of the first set of training predictors (e.g., first omic features).
-#' @param x_training2 A matrix or data frame of the second set of training predictors (e.g., second omic features).
-#' @param y_training A data frame containing survival outcomes with columns:
+#' @param x_training1 Numeric matrix (samples x features) for the first omics
+#'   layer.
+#' @param x_training2 Numeric matrix (samples x features) for the second omics
+#'   layer.
+#' @param y_training Data frame with \code{overall_survival} and \code{status}.
+#' @param model Character string specifying the AFT distribution:
+#'   \code{"weibull"} (default), \code{"lognormal"}, or \code{"loglogistic"}.
+#' @param rho_values Numeric vector of cooperation penalty parameters to
+#'   evaluate. Default is \code{c(0.25, 0.5, 0.75)}.
+#' @param ncore_max_rho Integer maximum cores for parallelisation across rho
+#'   values. Default is 10.
+#' @param ncore_max_cv Integer maximum cores for cross-validation. Default
+#'   is 10.
+#' @param seed Integer seed. Default is 123.
+#'
+#' @return A list with:
 #'   \itemize{
-#'     \item \code{overall_survival}: Numeric survival time
-#'     \item \code{status}: Numeric event indicator (1 = event, 0 = censored)
+#'     \item \code{final_model_coefs}: Data frame of coefficients
+#'       (features x rho values).
+#'     \item \code{sigma_est}: Estimated AFT scale parameter.
+#'     \item \code{rho_values}: Rho values used.
+#'     \item \code{pred}: Named list of training predictions, one per rho.
+#'     \item \code{selected_features}: Named list of selected features per rho.
+#'     \item \code{mU}, \code{mZ}: Column means of the two training matrices,
+#'       used to centre the test set consistently at prediction time.
 #'   }
-#' @param model Character string specifying the AFT distribution. Default is "weibull".
-#'   Other options include "lognormal" and "loglogistic".
-#' @param rho_values Numeric vector of correlation penalty parameters to evaluate.
-#'   Default is \code{c(0.25, 0.5, 0.75)}. Controls the cooperation between the two
-#'   predictor sets.
-#' @param ncore_max_rho Integer specifying the maximum number of cores to use for
-#'   parallel processing across rho values. Default is 10.
-#' @param ncore_max_cv Integer specifying the maximum number of cores to use for
-#'   cross-validation. Default is 10.
-#' @param seed Integer seed for reproducibility. Default is 123.
 #'
-#' @return A list containing:
-#'   \item{final_model_coefs}{Data frame of coefficient estimates for each rho value.
-#'     Rows correspond to features from both predictor sets, columns to rho values.}
-#'   \item{sigma_est}{Numeric estimated scale parameter (sigma) from the AFT model.}
-#'   \item{rho_values}{Numeric vector of rho values used in training (same as input).}
-#'   \item{pred}{Training set predictions for each rho value.}
-#'   \item{cindex}{Concordance indices (C-index) on training data for each rho value.}
-#'   \item{selected_features}{Named list of selected (non-zero) features for each rho value.}
-#'
-#' @details
-#' The function performs the following steps:
-#' \enumerate{
-#'   \item Prepares survival data (time, event indicator, log-transformed time)
-#'   \item Estimates the scale parameter (sigma) using \code{survival::survreg}
-#'   \item Fits cooperative AFT models across specified rho values using \code{aft_coop}
-#'   \item Generates predictions and calculates C-index for each rho value on training data
-#'   \item Identifies selected features (non-zero coefficients) for each rho value
-#' }
+#' @seealso \code{\link{train_j_models}}, \code{\link{test_AFTCoop}}
 #'
 #' @export
+train_AFTCoop <- function(
+    x_training1,
+    x_training2,
+    y_training,
+    model         = "weibull",
+    rho_values    = c(0.25, 0.5, 0.75),
+    ncore_max_rho = 10,
+    ncore_max_cv  = 10,
+    seed          = 123
+) {
 
-train_AFTCoop = function(x_training1, x_training2, y_training,
-                         model = "weibull", rho_values = c(0.25, 0.5, 0.75),
-                         ncore_max_rho = 10, ncore_max_cv = 10, seed = 123) {
   set.seed(seed)
 
-  # Surv
-  time = as.numeric(y_training$overall_survival)
-  event = as.numeric(y_training$status)
-  log_time = log(time)
-  y_surv = survival::Surv(time, event)
+  time     <- as.numeric(y_training$overall_survival)
+  event    <- as.numeric(y_training$status)
+  log_time <- log(time)
 
-  # check
-  x1 = as.matrix(x_training1)
-  x2 = as.matrix(x_training2)
+  x1 <- as.matrix(x_training1)
+  x2 <- as.matrix(x_training2)
 
-  # sigma
-  fit_survreg = survival::survreg(Surv(time, event) ~ 1, dist = model, scale = 0)
-  sigma_est = exp(fit_survreg$icoef[2])
-  message(paste("Sigma:", sigma_est))
+  # ── Estimate sigma ────────────────────────────────────────────────
+  fit_survreg <- survival::survreg(
+    survival::Surv(time, event) ~ 1,
+    dist  = model,
+    scale = 0
+  )
+  sigma_est <- exp(fit_survreg$icoef[[2]])
+  message("Sigma: ", round(sigma_est, 4))
 
-  # training
+  # ── Train ─────────────────────────────────────────────────────────
   message("AFTCoop training...")
-  final_model_coefs = aft_coop(
-    U = x1,
-    Z = x2,
-    Y = log_time,
-    delta = event,
-    model = model,
-    case = "coop",
-    lam_min = TRUE,
-    sigma = sigma_est,
-    rho_values = rho_values,
+  final_model_coefs <- aft_coop(
+    U             = x1,
+    Z             = x2,
+    Y             = log_time,
+    delta         = event,
+    model         = model,
+    case          = "coop",
+    lam_min       = TRUE,
+    sigma         = sigma_est,
+    rho_values    = rho_values,
     ncore_max_rho = ncore_max_rho,
-    ncore_max_cv = ncore_max_cv,
-    iplot = FALSE
+    ncore_max_cv  = ncore_max_cv,
+    iplot         = FALSE
   )
 
-  rownames(final_model_coefs) = colnames(cbind(x1, x2))
-  colnames(final_model_coefs) = paste0("beta_rho_", rho_values)
-  final_model_coefs = as.data.frame(final_model_coefs)
+  rownames(final_model_coefs) <- colnames(cbind(x1, x2))
+  colnames(final_model_coefs) <- paste0("beta_rho_", rho_values)
+  final_model_coefs           <- as.data.frame(final_model_coefs)
 
-  # pred
-  pred_train_list = list()
-  c_index_train_list = list()
-  selected_features_list = list()
+  # ── Predictions and selected features per rho ─────────────────────
+  pred_list     <- vector("list", length(rho_values))
+  selected_list <- vector("list", length(rho_values))
+  rho_names     <- colnames(final_model_coefs)
 
-  for (i in 1:length(rho_values)) {
-    rho_name = colnames(final_model_coefs)[i]
-    beta_coefs = final_model_coefs[, i]
-
-    # Predictions
-    pred = predict_aft_coop(U = x1, Z = x2, beta = beta_coefs, case = "coop")
-    pred_train_list[[rho_name]] = pred
-
-    # C-index
-    c_index = survival::concordance(y_surv ~ pred)
-    c_index_train_list[[rho_name]] = c_index$concordance
-
-    # Feature selected
-    selected_features_list[[rho_name]] = rownames(final_model_coefs)[beta_coefs != 0]
+  for (i in seq_along(rho_values)) {
+    beta_i             <- final_model_coefs[, i]
+    pred_list[[i]]     <- predict_aft_coop(U = x1, Z = x2,
+                                           beta = beta_i, case = "coop")
+    selected_list[[i]] <- rownames(final_model_coefs)[beta_i != 0]
   }
 
-  return(list(
+  names(pred_list) <- names(selected_list) <- rho_names
+
+  list(
     final_model_coefs = final_model_coefs,
-    sigma_est = sigma_est,
-    rho_values = rho_values,
-    pred = pred_train_list,
-    cindex = c_index_train_list,
-    selected_features = selected_features_list
-  ))
+    sigma_est         = sigma_est,
+    rho_values        = rho_values,
+    pred              = pred_list,
+    selected_features = selected_list,
+    mU                = colMeans(x1),   # training means for test centering
+    mZ                = colMeans(x2)
+  )
 }
+
 
 #' Test AFT Cooperative Learning Model
 #'
-#' Evaluates a trained AFT cooperative learning model on test data by generating
-#' predictions and calculating concordance indices for each rho value.
+#' Applies a trained AFTCoop model to test data, generating predictions for
+#' each rho value. The test matrices are centred using the training column
+#' means (\code{mU}, \code{mZ}) stored by \code{\link{train_AFTCoop}}, so no
+#' test-set information leaks into the linear predictor.
 #'
-#' @param x_test1 A matrix or data frame of the first set of test predictors.
-#'   Must have the same features (columns) as \code{x_training1} used in training.
-#' @param x_test2 A matrix or data frame of the second set of test predictors.
-#'   Must have the same features (columns) as \code{x_training2} used in training.
-#' @param y_test A data frame containing test survival outcomes with columns:
-#'   \itemize{
-#'     \item \code{overall_survival}: Numeric survival time
-#'     \item \code{status}: Numeric event indicator (1 = event, 0 = censored)
-#'   }
-#' @param training_result A list object returned by \code{\link{train_AFTCoop}}
-#'   containing the trained model coefficients and parameters.
+#' @param x_test1 Numeric matrix (samples x features) for the first omics
+#'   layer. Must match features used in training.
+#' @param x_test2 Numeric matrix (samples x features) for the second omics
+#'   layer. Must match features used in training.
+#' @param training_result List returned by \code{\link{train_AFTCoop}}.
 #'
-#' @return A list containing:
-#'   \item{pred}{Named list of test set predictions for each rho value.
-#'     Higher predicted values indicate higher risk (shorter predicted survival).}
-#'   \item{cindex}{Named list of concordance indices (C-index) on test data for each rho value.
-#'     Values range from 0 to 1, where 0.5 indicates random predictions and 1.0 indicates
-#'     perfect concordance.}
+#' @return A list with \code{pred}: named list of numeric prediction vectors,
+#'   one per rho value.
 #'
-#' @details
-#' This function applies the coefficients learned during training to new test data.
-#' For each rho value in the trained model:
-#' \enumerate{
-#'   \item Extracts the corresponding coefficient vector
-#'   \item Generates risk predictions using \code{predict_aft_coop}
-#'   \item Calculates the concordance index (C-index) comparing predictions to actual outcomes
-#' }
+#' @seealso \code{\link{train_AFTCoop}}, \code{\link{predict_j_models}}
 #'
 #' @export
-test_AFTCoop = function(x_test1, x_test2, y_test, training_result) {
+test_AFTCoop <- function(x_test1, x_test2, training_result) {
 
-  # check
-  x1_test = as.matrix(x_test1)
-  x2_test = as.matrix(x_test2)
+  x1 <- as.matrix(x_test1)
+  x2 <- as.matrix(x_test2)
 
-  # surv
-  time = as.numeric(y_test$overall_survival)
-  event = as.numeric(y_test$status)
+  final_model_coefs <- training_result$final_model_coefs
+  rho_names         <- colnames(final_model_coefs)
 
-  y_test_surv = survival::Surv(time, event)
+  pred_list <- vector("list", length(rho_names))
 
-  # rho extraction
-  final_model_coefs = training_result$final_model_coefs
-  rho_values = training_result$rho_values
-
-  # pred
-  pred_test_list = list()
-  c_index_test_list = list()
-
-  for (i in 1:length(rho_values)) {
-    rho_name = colnames(final_model_coefs)[i]
-    beta_coefs = final_model_coefs[, i]
-
-    # Prediction
-    pred = predict_aft_coop(U = x1_test, Z = x2_test, beta = beta_coefs, case = "coop")
-    pred_test_list[[rho_name]] = pred
-
-    # C-index
-    c_index = survival::concordance(y_test_surv ~ pred)
-    c_index_test_list[[rho_name]] = c_index$concordance
+  for (i in seq_along(rho_names)) {
+    beta_i         <- final_model_coefs[, i]
+    pred_list[[i]] <- predict_aft_coop(
+      U    = x1, Z = x2,
+      mU   = training_result$mU,   # centre on TRAINING means
+      mZ   = training_result$mZ,
+      beta = beta_i,
+      case = "coop"
+    )
   }
 
-  return(list(
-    pred = pred_test_list,
-    cindex = c_index_test_list
-  ))
+  names(pred_list) <- rho_names
+
+  list(pred = pred_list)
 }

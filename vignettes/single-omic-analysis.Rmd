@@ -1,0 +1,437 @@
+---
+title: "Single-omics survival analysis"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Single-omics survival analysis}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment  = "#>",
+  eval     = FALSE
+)
+```
+
+```{r setup}
+library(Omics2Surv)
+```
+
+## Introduction
+
+This vignette walks through a complete **single-omics** survival analysis
+workflow, from data acquisition to patient stratification and functional
+enrichment. As a working example we use the TCGA-KIPAN cohort (Pan-Kidney Cohort), 
+retrieving RNA-seq, copy number variance (CNV) and
+DNA methylation data together with the corresponding clinical information.
+
+Although three omics layers are downloaded and assembled into a single
+`MultiAssayExperiment` (MAE), in this vignette each omic is modeled
+**independently**, one at a time. For a workflow that combines multiple
+omics into a single predictive model, see the companion
+`vignette("multi-omic-analysis")`.
+
+## Data acquisition & exploration
+
+We start by retrieving the omics and clinical data from LinkedOmics for the
+TCGA-KIPAN cohort.
+
+```{r}
+KIPANRNA_link = retrieve_linkedomics_data("TCGA-KIPAN","RNAseq (HiSeq, Gene level)")
+
+KIPANCN_link = retrieve_linkedomics_data("TCGA-KIPAN", "SCNV (Gene level, Thresholded)")
+
+KIPAN_Meth_link= retrieve_linkedomics_data("TCGA-KIPAN", "Methylation (Gene level, HM450K)")
+
+KIPANClin_link= retrieve_linkedomics_data("TCGA-KIPAN", "Clinical")
+```
+
+### Exploration
+
+Before any modeling step, it is good practice to explore the data structure.
+`explore_pca()` performs a principal component analysis on the RNA-seq data
+and relates the resulting components to a set of clinical/metadata variables.
+
+```{r}
+data_expl= explore_pca(KIPANRNA_link, KIPANClin_link, 
+  metavars = c("histological_type", "gender", "radiation_therapy", "race", "ethnicity"))
+
+data_expl$eigencorplot
+```
+
+## Data preselection
+
+### Optional splitting
+
+The cohort is split into a training and a test set. The same split is
+shared across all omics layers so that the same patients end up in the
+training set (and the same patients in the test set) for every layer.
+
+```{r}
+KIPAN_split = split_train_test(
+  omics_list     = list(mRNA = KIPANRNA_link,
+                        CNV  = KIPANCN_link, methyl = KIPAN_Meth_link),
+  clinical_data  = KIPANClin_link
+)
+
+```
+
+### Variable screening
+
+Each omic is preprocessed and screened on the training set only, to avoid
+information leakage from the test set. Here RNA-seq features are selected in
+an unsupervised fashion based on highly variable genes, CNV features are
+selected based on sparsity, and methylation features are selected based on
+interquartile range (IQR).
+
+```{r}
+KIPAN_RNA_train=prepare_RNA(KIPAN_split$train_list$mRNA,   KIPAN_split$train_clinical,method = "unsupervised", unsupervised_method= "A", hvg_threshold = 5)
+KIPAN_CNV_train=prepare_CNV(KIPAN_split$train_list$CNV,   KIPAN_split$train_clinical,method = "unsupervised", unsupervised_method = "sparsity", top_n_features = 800)
+KIPAN_Meth_train=prepare_methyl(KIPAN_split$train_list$methyl,   KIPAN_split$train_clinical, method="unsupervised", unsupervised_method = "IQR", hvg_threshold = 5)
+```
+
+The same features selected on the training set are then applied to the test
+set with `prepare_test_SE()`, so that train and test share an identical
+feature space.
+
+```{r}
+KIPAN_RNA_test= prepare_test_SE(KIPAN_split$test_list$mRNA,   KIPAN_RNA_train)
+KIPAN_Meth_test= prepare_test_SE(KIPAN_split$test_list$methyl,  KIPAN_Meth_train)
+KIPAN_CNV_test= prepare_test_SE(KIPAN_split$test_list$CNV,   KIPAN_CNV_train)
+```
+
+```{r}
+omics_train = list(mRNA=KIPAN_RNA_train, CNV=KIPAN_CNV_train, meth= KIPAN_Meth_train)
+
+omics_test = list(mRNA= KIPAN_RNA_test, CNV= KIPAN_CNV_test, meth= KIPAN_Meth_test)
+```
+
+### MAE building with 3 omics
+
+The preprocessed omics and the clinical data are assembled into a
+`MultiAssayExperiment` object, separately for the training and the test set.
+
+```{r}
+KIPAN_MAE_train = build_MAE(omics_list = omics_train, KIPAN_split$train_clinical)
+
+KIPAN_MAE_test = build_MAE(omics_list = omics_test, KIPAN_split$test_clinical)
+```
+Combine train and test clinical data to inspect the overall cohort, 
+and check the censoring rate of the survival status.
+
+```{r}
+KIPAN_train_clin = as.data.frame(KIPAN_MAE_train@colData)
+KIPAN_test_clin = as.data.frame(KIPAN_MAE_test@colData)
+KIPAN_all_clin = as.data.frame(rbind(KIPAN_train_clin, KIPAN_test_clin))
+
+censoring_rate(KIPAN_all_clin$status)
+
+display_counts(KIPAN_all_clin,"status")
+```
+
+## Single-omics modeling
+
+Even though the MAE contains three omics layers, the models below are
+trained on **one omic at a time** (`integration = "none"`), so that each
+modality's predictive performance can be assessed independently.
+
+### Penalized regression models
+
+#### RNA
+
+Four penalized regression models are trained on the RNA-seq data: a Cox
+LASSO, a Cox Adaptive LASSO, a Cox Elastic Net, and a penalized
+Accelerated Failure Time (AFT) model.
+
+```{r}
+#cox_lasso
+KIPAN_MAE_train = train_pen_reg_models(
+  mae_train    = KIPAN_MAE_train,
+  omic_list    = c("mRNA"),
+  integration  = "none",
+  model_method = "cox_lasso",
+  nlambda= 200,
+  nfolds= 10,
+  seed = 8290
+)
+
+KIPAN_MAE_test = predict_pen_reg_models(
+  mae_pred     = KIPAN_MAE_test,
+  mae_train    = KIPAN_MAE_train,
+  omic_list    = c("mRNA"),
+  integration  = "none",
+  model_method = "cox_lasso"
+)
+```
+
+```{r}
+#adaptive lasso
+KIPAN_MAE_train = train_pen_reg_models(
+  mae_train    = KIPAN_MAE_train,
+  omic_list    = c("mRNA"),
+  integration  = "none",
+  model_method = "cox_adaptive_lasso",
+  nlambda= 100,
+  nfolds= 10,
+  seed = 8290
+)
+
+KIPAN_MAE_test = predict_pen_reg_models(
+  mae_pred     = KIPAN_MAE_test,
+  mae_train    = KIPAN_MAE_train,
+  omic_list    = c("mRNA"),
+  integration  = "none",
+  model_method = "cox_adaptive_lasso"
+)
+```
+
+```{r}
+#elastic net
+KIPAN_MAE_train = train_pen_reg_models(
+  mae_train    = KIPAN_MAE_train,
+  omic_list    = c("mRNA"),
+  integration  = "none",
+  model_method = "cox_elastic_net",
+  nlambda= 200,
+  nfolds= 10,
+  seed = 8290
+)
+
+KIPAN_MAE_test = predict_pen_reg_models(
+  mae_pred     = KIPAN_MAE_test,
+  mae_train    = KIPAN_MAE_train,
+  omic_list    = c("mRNA"),
+  integration  = "none",
+  model_method = "cox_elastic_net"
+)
+```
+
+```{r}
+#penAFT
+KIPAN_MAE_train = train_pen_reg_models(
+  mae_train    = KIPAN_MAE_train,
+  omic_list    = c("mRNA"),
+  integration  = "none",
+  model_method = "aft_pen",
+  nlambda= 200,
+  nfolds= 10,
+  seed = 8290
+)
+
+KIPAN_MAE_test = predict_pen_reg_models(
+  mae_pred     = KIPAN_MAE_test,
+  mae_train    = KIPAN_MAE_train,
+  omic_list    = c("mRNA"),
+  integration  = "none",
+  model_method = "aft_pen"
+)
+```
+
+#### Methylation
+
+The same four models are trained on the methylation data.
+
+```{r}
+#cox_lasso 
+KIPAN_MAE_train = train_pen_reg_models( mae_train = KIPAN_MAE_train, omic_list = c("meth"), integration = "none", model_method = "cox_lasso", nlambda= 200, nfolds= 10, seed = 8290 )
+
+KIPAN_MAE_test = predict_pen_reg_models( mae_pred = KIPAN_MAE_test, mae_train = KIPAN_MAE_train, omic_list = c("meth"), integration = "none", model_method = "cox_lasso" )
+```
+
+```{r}
+#adaptive lasso
+KIPAN_MAE_train = train_pen_reg_models(
+  mae_train    = KIPAN_MAE_train,
+  omic_list    = c("meth"),
+  integration  = "none",
+  model_method = "cox_adaptive_lasso",
+  nlambda= 200,
+  nfolds= 10,
+  seed = 8290
+)
+
+KIPAN_MAE_test = predict_pen_reg_models(
+  mae_pred     = KIPAN_MAE_test,
+  mae_train    = KIPAN_MAE_train,
+  omic_list    = c("meth"),
+  integration  = "none",
+  model_method = "cox_adaptive_lasso"
+)
+```
+
+```{r}
+#elastic net
+KIPAN_MAE_train = train_pen_reg_models(
+  mae_train    = KIPAN_MAE_train,
+  omic_list    = c("meth"),
+  integration  = "none",
+  model_method = "cox_elastic_net",
+  nlambda= 200,
+  nfolds= 10,
+  seed = 8290
+)
+
+KIPAN_MAE_test = predict_pen_reg_models(
+  mae_pred     = KIPAN_MAE_test,
+  mae_train    = KIPAN_MAE_train,
+  omic_list    = c("meth"),
+  integration  = "none",
+  model_method = "cox_elastic_net"
+)
+```
+
+```{r}
+#penAFT
+KIPAN_MAE_train = train_pen_reg_models(
+  mae_train    = KIPAN_MAE_train,
+  omic_list    = c("meth"),
+  integration  = "none",
+  model_method = "aft_pen",
+  nlambda= 200,
+  nfolds= 10,
+  seed = 8290
+)
+
+KIPAN_MAE_test = predict_pen_reg_models(
+  mae_pred     = KIPAN_MAE_test,
+  mae_train    = KIPAN_MAE_train,
+  omic_list    = c("meth"),
+  integration  = "none",
+  model_method = "aft_pen"
+)
+```
+
+#### CNV
+
+Finally, the same four models are trained on the CNV data.
+
+```{r}
+#cox_lasso
+KIPAN_MAE_train = train_pen_reg_models(
+  mae_train    = KIPAN_MAE_train,
+  omic_list    = c("CNV"),
+  integration  = "none",
+  model_method = "cox_lasso",
+  nlambda= 200,
+  nfolds= 10,
+  seed = 8290
+)
+
+KIPAN_MAE_test = predict_pen_reg_models(
+  mae_pred     = KIPAN_MAE_test,
+  mae_train    = KIPAN_MAE_train,
+  omic_list    = c("CNV"),
+  integration  = "none",
+  model_method = "cox_lasso"
+)
+```
+
+```{r}
+#adaptive lasso
+KIPAN_MAE_train = train_pen_reg_models(
+  mae_train    = KIPAN_MAE_train,
+  omic_list    = c("CNV"),
+  integration  = "none",
+  model_method = "cox_adaptive_lasso",
+  nlambda= 200,
+  nfolds= 10,
+  seed = 8290
+)
+
+KIPAN_MAE_test = predict_pen_reg_models(
+  mae_pred     = KIPAN_MAE_test,
+  mae_train    = KIPAN_MAE_train,
+  omic_list    = c("CNV"),
+  integration  = "none",
+  model_method = "cox_adaptive_lasso"
+)
+```
+
+```{r}
+#elastic net
+KIPAN_MAE_train = train_pen_reg_models(
+  mae_train    = KIPAN_MAE_train,
+  omic_list    = c("CNV"),
+  integration  = "none",
+  model_method = "cox_elastic_net",
+  nlambda= 200,
+  nfolds= 10,
+  seed = 8290
+)
+
+KIPAN_MAE_test = predict_pen_reg_models(
+  mae_pred     = KIPAN_MAE_test,
+  mae_train    = KIPAN_MAE_train,
+  omic_list    = c("CNV"),
+  integration  = "none",
+  model_method = "cox_elastic_net"
+)
+```
+
+```{r}
+KIPAN_MAE_train = train_pen_reg_models(
+  mae_train    = KIPAN_MAE_train,
+  omic_list    = c("CNV"),
+  integration  = "none",
+  model_method = "aft_pen",
+  nlambda= 200,
+  nfolds= 10,
+  seed = 8290
+)
+
+KIPAN_MAE_test = predict_pen_reg_models(
+  mae_pred     = KIPAN_MAE_test,
+  mae_train    = KIPAN_MAE_train,
+  omic_list    = c("CNV"),
+  integration  = "none",
+  model_method = "aft_pen"
+)
+```
+
+## C-index tables
+
+`benchmark_models()` collects the concordance index (C-index) achieved by
+every model trained so far and returns a comparison table. Here we restrict
+the comparison to the three single-omic datasets.
+
+```{r}
+KIPAN_single= benchmark_models(KIPAN_MAE_train, KIPAN_MAE_test, keep_datasets = c("mRNA","meth","CNV"))
+```
+
+## Patient stratification
+
+Using the risk scores from the best performing single-omic model
+(`aft_pen` on RNA in this example), patients can be stratified into risk
+groups and the results visualized with Kaplan-Meier curves, UMAP embeddings,
+and heatmaps.
+
+```{r}
+KIPAN_strat = patient_stratification(KIPAN_MAE_train, KIPAN_MAE_test,
+                               model = "aft_pen",                                modality = "mRNA",
+                                 method = "survcutpoint",
+                                 plot_scores = TRUE)
+plot_km(KIPAN_strat)
+plot_umap(KIPAN_MAE_test, KIPAN_strat, model = "aft_pen",
+             modality = "mRNA", mae_train = KIPAN_MAE_train, n_neighbors = 10)
+```
+
+```{r}
+plot_heatmap(KIPAN_MAE_test, KIPAN_strat, model = "aft_pen",
+             modality = "mRNA", mae_train = KIPAN_MAE_train)
+```
+
+Finally, the genes selected by the model can be tested for functional
+enrichment.
+
+```{r}
+KIPAN_RNA_en = enrich_features(KIPAN_MAE_train, model = "aft_pen", modality = "mRNA")
+plot_enrichment(KIPAN_RNA_en, "GO")
+```
+
+## Session info
+
+```{r}
+sessionInfo()
+```

@@ -1,6 +1,6 @@
 Package: Omics2Surv
 Title: Integrative survival analysis for multi-omics data
-Version: 0.0.1
+Version: 1.0.0
 Authors@R: c(
     person("Francesca", "Calanca",
     email= "francescacalanca@cnr.it", 
@@ -12,31 +12,19 @@ Authors@R: c(
     role = c("aut"))
     )
 Description: Omics2Surv is an R package for survival analysis with high-dimensional multi-omics data.
-License:
+License: MIT + file LICENSE
 Imports: 
-    BiocParallel,
-    blockForest,
-    data.table,
-    doParallel,
-    ggplot2,
-    glmnet,
-    M3C,
-    MultiAssayExperiment,
-    parallel,
-    penAFT,
-    readr,
-    reticulate,
-    RobustRankAggreg,
-    ROCR,
-    S4Vectors,
-    SummarizedExperiment,
-    survival,
-    TCGAbiolinks,
-    tibble
+    methods, BiocParallel, doParallel, dplyr, ggplot2, glmnet, M3C,MultiAssayExperiment, parallel, PCAtools, penAFT, readr, 
+    Rdimtools,reticulate, RobustRankAggreg, S4Vectors, SummarizedExperiment,survAUC, survival, TCGAbiolinks,
+    blockForest, clusterProfiler, enrichplot, org.Hs.eg.db,pheatmap, ReactomePA, survminer, uwot
 Remotes: 
   angeclau/AFTCoop
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.3
 URL: https://github.com/FraCalanca/Omics2Surv, https://fracalanca.github.io/Omics2Surv/
 BugReports: https://github.com/FraCalanca/Omics2Surv/issues
+Config/roxygen2/version: 8.0.0
+Suggests: 
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr

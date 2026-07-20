@@ -16,54 +16,45 @@ train_AFTCoop(
 )
 }
 \arguments{
-\item{x_training1}{A matrix or data frame of the first set of training predictors (e.g., first omic features).}
+\item{x_training1}{Numeric matrix (samples x features) for the first omics
+layer.}
 
-\item{x_training2}{A matrix or data frame of the second set of training predictors (e.g., second omic features).}
+\item{x_training2}{Numeric matrix (samples x features) for the second omics
+layer.}
 
-\item{y_training}{A data frame containing survival outcomes with columns:
-\itemize{
-\item \code{overall_survival}: Numeric survival time
-\item \code{status}: Numeric event indicator (1 = event, 0 = censored)
-}}
+\item{y_training}{Data frame with \code{overall_survival} and \code{status}.}
 
-\item{model}{Character string specifying the AFT distribution. Default is "weibull".
-Other options include "lognormal" and "loglogistic".}
+\item{model}{Character string specifying the AFT distribution:
+\code{"weibull"} (default), \code{"lognormal"}, or \code{"loglogistic"}.}
 
-\item{rho_values}{Numeric vector of correlation penalty parameters to evaluate.
-Default is \code{c(0.25, 0.5, 0.75)}. Controls the cooperation between the two
-predictor sets.}
+\item{rho_values}{Numeric vector of cooperation penalty parameters to
+evaluate. Default is \code{c(0.25, 0.5, 0.75)}.}
 
-\item{ncore_max_rho}{Integer specifying the maximum number of cores to use for
-parallel processing across rho values. Default is 10.}
+\item{ncore_max_rho}{Integer maximum cores for parallelisation across rho
+values. Default is 10.}
 
-\item{ncore_max_cv}{Integer specifying the maximum number of cores to use for
-cross-validation. Default is 10.}
+\item{ncore_max_cv}{Integer maximum cores for cross-validation. Default
+is 10.}
 
-\item{seed}{Integer seed for reproducibility. Default is 123.}
+\item{seed}{Integer seed. Default is 123.}
 }
 \value{
-A list containing:
-\item{final_model_coefs}{Data frame of coefficient estimates for each rho value.
-Rows correspond to features from both predictor sets, columns to rho values.}
-\item{sigma_est}{Numeric estimated scale parameter (sigma) from the AFT model.}
-\item{rho_values}{Numeric vector of rho values used in training (same as input).}
-\item{pred}{Training set predictions for each rho value.}
-\item{cindex}{Concordance indices (C-index) on training data for each rho value.}
-\item{selected_features}{Named list of selected (non-zero) features for each rho value.}
+A list with:
+\itemize{
+\item \code{final_model_coefs}: Data frame of coefficients
+(features x rho values).
+\item \code{sigma_est}: Estimated AFT scale parameter.
+\item \code{rho_values}: Rho values used.
+\item \code{pred}: Named list of training predictions, one per rho.
+\item \code{selected_features}: Named list of selected features per rho.
+\item \code{mU}, \code{mZ}: Column means of the two training matrices,
+used to centre the test set consistently at prediction time.
+}
 }
 \description{
-Trains an Accelerated Failure Time (AFT) model using cooperative learning
-with two sets of predictors. The function fits a regularized survival model
-across multiple correlation (rho) values and returns coefficients, predictions,
-and performance metrics.
+Trains an Accelerated Failure Time cooperative learning model on exactly
+two omics layers. Called internally by \code{\link{train_j_models}}.
 }
-\details{
-The function performs the following steps:
-\enumerate{
-\item Prepares survival data (time, event indicator, log-transformed time)
-\item Estimates the scale parameter (sigma) using \code{survival::survreg}
-\item Fits cooperative AFT models across specified rho values using \code{aft_coop}
-\item Generates predictions and calculates C-index for each rho value on training data
-\item Identifies selected features (non-zero coefficients) for each rho value
-}
+\seealso{
+\code{\link{train_j_models}}, \code{\link{test_AFTCoop}}
 }

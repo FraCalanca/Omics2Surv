@@ -4,42 +4,27 @@
 \alias{test_AFTCoop}
 \title{Test AFT Cooperative Learning Model}
 \usage{
-test_AFTCoop(x_test1, x_test2, y_test, training_result)
+test_AFTCoop(x_test1, x_test2, training_result)
 }
 \arguments{
-\item{x_test1}{A matrix or data frame of the first set of test predictors.
-Must have the same features (columns) as \code{x_training1} used in training.}
+\item{x_test1}{Numeric matrix (samples x features) for the first omics
+layer. Must match features used in training.}
 
-\item{x_test2}{A matrix or data frame of the second set of test predictors.
-Must have the same features (columns) as \code{x_training2} used in training.}
+\item{x_test2}{Numeric matrix (samples x features) for the second omics
+layer. Must match features used in training.}
 
-\item{y_test}{A data frame containing test survival outcomes with columns:
-\itemize{
-\item \code{overall_survival}: Numeric survival time
-\item \code{status}: Numeric event indicator (1 = event, 0 = censored)
-}}
-
-\item{training_result}{A list object returned by \code{\link{train_AFTCoop}}
-containing the trained model coefficients and parameters.}
+\item{training_result}{List returned by \code{\link{train_AFTCoop}}.}
 }
 \value{
-A list containing:
-\item{pred}{Named list of test set predictions for each rho value.
-Higher predicted values indicate higher risk (shorter predicted survival).}
-\item{cindex}{Named list of concordance indices (C-index) on test data for each rho value.
-Values range from 0 to 1, where 0.5 indicates random predictions and 1.0 indicates
-perfect concordance.}
+A list with \code{pred}: named list of numeric prediction vectors,
+one per rho value.
 }
 \description{
-Evaluates a trained AFT cooperative learning model on test data by generating
-predictions and calculating concordance indices for each rho value.
+Applies a trained AFTCoop model to test data, generating predictions for
+each rho value. The test matrices are centred using the training column
+means (\code{mU}, \code{mZ}) stored by \code{\link{train_AFTCoop}}, so no
+test-set information leaks into the linear predictor.
 }
-\details{
-This function applies the coefficients learned during training to new test data.
-For each rho value in the trained model:
-\enumerate{
-\item Extracts the corresponding coefficient vector
-\item Generates risk predictions using \code{predict_aft_coop}
-\item Calculates the concordance index (C-index) comparing predictions to actual outcomes
-}
+\seealso{
+\code{\link{train_AFTCoop}}, \code{\link{predict_j_models}}
 }
