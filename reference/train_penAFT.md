@@ -12,7 +12,7 @@ train_penAFT(
   x_training,
   y_training,
   nfolds = 5,
-  penalty = "EN",
+  penalty = c("EN", "SG"),
   alpha_range = seq(0.1, 0.9, by = 0.1),
   groups = NULL,
   nlambda = 100,
@@ -38,7 +38,7 @@ train_penAFT(
 - penalty:
 
   Character. The penalty type to apply: `"EN"` (Elastic Net) or `"SG"`
-  (Sparse Group LASSO).
+  (Sparse Group LASSO). Default is `"EN"`.
 
 - alpha_range:
 
@@ -73,7 +73,5 @@ A named list containing:
 - `coefficients`: Vector of estimated coefficients.
 
 - `pred`: Linear predictors for the training set.
-
-- `cindex`: Training set Concordance Index.
 
 - `cv_results`: A list of results for all tested `alpha` values.

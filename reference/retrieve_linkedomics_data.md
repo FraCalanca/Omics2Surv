@@ -2,7 +2,9 @@
 
 Downloads omics or clinical data for a specific cancer type from
 LinkedOmics via TCGAbiolinks, performs quality checks, and formats the
-data for analysis.
+data for analysis. For omics data, features (rows) with any `NA` across
+samples are removed at this stage so that all downstream functions
+receive complete matrices.
 
 ## Usage
 
@@ -14,23 +16,37 @@ retrieve_linkedomics_data(cancer_type, data_type)
 
 - cancer_type:
 
-  Character string specifying the TCGA cancer type abbreviation (e.g.,
-  "BRCA", "LUAD", "COAD").
+  Character string specifying the TCGA cancer type (e.g. `"TCGA-BRCA"`,
+  `"TCGA-LGG"`).
 
 - data_type:
 
-  Character string specifying the data type to retrieve (e.g.,
-  "Clinical", "mRNA", "Protein", "miRNA"). See TCGAbiolinks
-  documentation for available types.
+  Character string specifying the data type to retrieve (e.g.
+  `"RNASeq (HiSeq, Gene Level)"`, `"Methylation (Gene level, HM450K)"`,
+  `"Clinical"`). See
+  [`TCGAbiolinks::getLinkedOmicsData`](https://rdrr.io/pkg/TCGAbiolinks/man/getLinkedOmicsData.html)
+  for available types.
 
 ## Value
 
-A data frame with:
+A matrix with:
 
-- Rows: Features (genes, proteins, clinical variables, etc.) from the
-  `attrib_name` column
+- Rows: features (genes, CpG sites, clinical variables, etc.)
 
-- Columns: Samples (TCGA patient identifiers)
+- Columns: TCGA sample identifiers
 
-- For clinical data: Samples with NA in "overall_survival" or "status"
-  are removed
+- For omics data: features with any `NA` are removed.
+
+- For clinical data: samples with `NA` in `"overall_survival"` or
+  `"status"` are removed.
+
+- For methylation data: beta-values are shifted by +0.5 before return.
+
+## Examples
+
+``` r
+if (FALSE) { # \dontrun{
+LGG_RNA  <- retrieve_linkedomics_data("TCGA-LGG", "RNASeq (HiSeq, Gene Level)")
+LGG_Clin <- retrieve_linkedomics_data("TCGA-LGG", "Clinical")
+} # }
+```

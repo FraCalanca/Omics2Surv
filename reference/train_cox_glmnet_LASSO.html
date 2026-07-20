@@ -5,11 +5,11 @@ with k-fold cross-validation and parallel processing support."><meta property="o
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
-    <nav class="navbar navbar-expand-lg fixed-top bg-primary" data-bs-theme="dark" aria-label="Site navigation"><div class="container">
+    <nav class="navbar navbar-expand-lg fixed-top bg-light" data-bs-theme="light" aria-label="Site navigation"><div class="container">
 
     <a class="navbar-brand me-2" href="../index.html">Omics2Surv</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -18,7 +18,14 @@ with k-fold cross-validation and parallel processing support."><meta property="o
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
       <ul class="navbar-nav me-auto"><li class="active nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
-      </ul><ul class="navbar-nav"><li class="nav-item"><a class="external-link nav-link" href="https://github.com/FraCalanca/Omics2Surv/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
+<li class="nav-item dropdown">
+  <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
+  <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="../articles/multi-omic-analysis.html">Multi-omics survival analysis</a></li>
+    <li><a class="dropdown-item" href="../articles/single-omic-analysis.html">Single-omics survival analysis</a></li>
+  </ul></li>
+      </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
+ <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json"></form></li>
+<li class="nav-item"><a class="external-link nav-link" href="https://github.com/FraCalanca/Omics2Surv/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
       </ul></div>
 
 
@@ -27,7 +34,7 @@ with k-fold cross-validation and parallel processing support."><meta property="o
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="../logo.png" class="logo" alt=""><h1>Train a Cox LASSO Model with Cross-Validation</h1>
-      <small class="dont-index">Source: <a href="https://github.com/FraCalanca/Omics2Surv/blob/master/R/train_cox_glmnet_LASSO.R" class="external-link"><code>R/train_cox_glmnet_LASSO.R</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/FraCalanca/Omics2Surv/blob/master/R/pen_Cox.R" class="external-link"><code>R/pen_Cox.R</code></a></small>
       <div class="d-none name"><code>train_cox_glmnet_LASSO.Rd</code></div>
     </div>
 
@@ -42,12 +49,13 @@ with k-fold cross-validation and parallel processing support.</p>
 <span>  <span class="va">x_training</span>,</span>
 <span>  <span class="va">y_training</span>,</span>
 <span>  nfolds <span class="op">=</span> <span class="fl">5</span>,</span>
-<span>  optimal_lambda <span class="op">=</span> <span class="st">"minimum"</span>,</span>
-<span>  type_measure <span class="op">=</span> <span class="st">"C"</span>,</span>
+<span>  optimal_lambda <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"minimum"</span>, <span class="st">"1se"</span><span class="op">)</span>,</span>
+<span>  type_measure <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"C"</span>, <span class="st">"deviance"</span><span class="op">)</span>,</span>
 <span>  penalty <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  system_type <span class="op">=</span> <span class="st">"unix"</span>,</span>
-<span>  nlambda <span class="op">=</span> <span class="fl">200</span>,</span>
-<span>  seed <span class="op">=</span> <span class="fl">123</span></span>
+<span>  nlambda <span class="op">=</span> <span class="fl">100</span>,</span>
+<span>  seed <span class="op">=</span> <span class="fl">123</span>,</span>
+<span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -74,12 +82,12 @@ with k-fold cross-validation and parallel processing support.</p>
 
 
 <dt id="arg-type-measure">type_measure<a class="anchor" aria-label="anchor" href="#arg-type-measure"></a></dt>
-<dd><p>Character. Loss function for cross-validation.
-Default is <code>"C"</code> (C-index).</p></dd>
+<dd><p>Character. Loss function for cross-validation:
+<code>"C"</code> (C-index, default) or <code>"deviance"</code>.</p></dd>
 
 
 <dt id="arg-penalty">penalty<a class="anchor" aria-label="anchor" href="#arg-penalty"></a></dt>
-<dd><p>Optional numeric vector for penalty factors (e.g., for Adaptive LASSO).</p></dd>
+<dd><p>Optional numeric vector for penalty factors.</p></dd>
 
 
 <dt id="arg-system-type">system_type<a class="anchor" aria-label="anchor" href="#arg-system-type"></a></dt>
@@ -89,21 +97,25 @@ or <code>"windows"</code>, to handle parallel backend registration.</p></dd>
 
 <dt id="arg-nlambda">nlambda<a class="anchor" aria-label="anchor" href="#arg-nlambda"></a></dt>
 <dd><p>Integer. The number of \(\lambda\) values in the sequence.
-Default is 200.</p></dd>
+Default is 100.</p></dd>
 
 
 <dt id="arg-seed">seed<a class="anchor" aria-label="anchor" href="#arg-seed"></a></dt>
 <dd><p>Integer. Seed for reproducibility of cross-validation folds.</p></dd>
 
+
+<dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
+<dd><p>Additional arguments (currently unused).</p></dd>
+
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A named list containing:</p><ul><li><p><code>optimal_lambda</code>: The selection rule used.</p></li>
+<li><p><code>type_measure</code>: The cross-validation loss function used.</p></li>
 <li><p><code>cv_fit</code>: The fitted <code>cv.glmnet</code> object.</p></li>
 <li><p><code>selected_lambda</code>: The numeric value of the chosen \(\lambda\).</p></li>
 <li><p><code>selected_features</code>: Character vector of predictors with non-zero coefficients.</p></li>
 <li><p><code>pred</code>: Linear predictors for the training set.</p></li>
-<li><p><code>cindex</code>: Training set Concordance Index.</p></li>
 </ul></div>
 
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
@@ -115,7 +127,7 @@ Default is 200.</p></dd>
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer></div>

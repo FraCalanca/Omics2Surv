@@ -12,12 +12,12 @@ train_cox_glmnet_ElasticNet(
   x_training,
   y_training,
   nfolds = 5,
-  optimal_lambda = "minimum",
-  type_measure = "C",
+  optimal_lambda = c("minimum", "1se"),
+  type_measure = c("C", "deviance"),
   alpha_range = seq(0.1, 0.9, by = 0.1),
   penalty = NULL,
-  system_type = "unix",
-  nlambda = 200,
+  system_type = c("unix", "windows"),
+  nlambda = 100,
   seed = 123
 )
 ```
@@ -44,8 +44,8 @@ train_cox_glmnet_ElasticNet(
 
 - type_measure:
 
-  Character. Performance metric for CV (e.g., `"C"` for C-index or
-  `"deviance"`).
+  Character. Performance metric for CV: `"C"` (C-index, default) or
+  `"deviance"`.
 
 - alpha_range:
 
@@ -63,7 +63,7 @@ train_cox_glmnet_ElasticNet(
 - nlambda:
 
   Integer. Number of \\\lambda\\ values in each `glmnet` path. Default
-  is 200.
+  is 100.
 
 - seed:
 
@@ -83,5 +83,3 @@ A named list containing:
   chosen alpha/lambda.
 
 - `pred`: Linear predictors for the training set.
-
-- `cindex`: Training set Concordance Index.

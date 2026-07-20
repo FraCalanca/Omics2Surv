@@ -10,12 +10,13 @@ train_cox_glmnet_LASSO(
   x_training,
   y_training,
   nfolds = 5,
-  optimal_lambda = "minimum",
-  type_measure = "C",
+  optimal_lambda = c("minimum", "1se"),
+  type_measure = c("C", "deviance"),
   penalty = NULL,
   system_type = "unix",
-  nlambda = 200,
-  seed = 123
+  nlambda = 100,
+  seed = 123,
+  ...
 )
 ```
 
@@ -41,13 +42,12 @@ train_cox_glmnet_LASSO(
 
 - type_measure:
 
-  Character. Loss function for cross-validation. Default is `"C"`
-  (C-index).
+  Character. Loss function for cross-validation: `"C"` (C-index,
+  default) or `"deviance"`.
 
 - penalty:
 
-  Optional numeric vector for penalty factors (e.g., for Adaptive
-  LASSO).
+  Optional numeric vector for penalty factors.
 
 - system_type:
 
@@ -57,17 +57,23 @@ train_cox_glmnet_LASSO(
 - nlambda:
 
   Integer. The number of \\\lambda\\ values in the sequence. Default is
-  200.
+  100.
 
 - seed:
 
   Integer. Seed for reproducibility of cross-validation folds.
+
+- ...:
+
+  Additional arguments (currently unused).
 
 ## Value
 
 A named list containing:
 
 - `optimal_lambda`: The selection rule used.
+
+- `type_measure`: The cross-validation loss function used.
 
 - `cv_fit`: The fitted `cv.glmnet` object.
 
@@ -77,5 +83,3 @@ A named list containing:
   coefficients.
 
 - `pred`: Linear predictors for the training set.
-
-- `cindex`: Training set Concordance Index.

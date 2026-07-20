@@ -1,12 +1,11 @@
 # Evaluate Cox GLMNET Model on Test Data
 
-Predicts risk scores and calculates the Concordance Index (C-index) for
-a fitted Cox lasso model using independent test data.
+Predicts risk scores for a fitted Cox model using independent test data.
 
 ## Usage
 
 ``` r
-test_cox_glmnet(x_test, y_test, training_result)
+test_cox_glmnet(x_test, training_result)
 ```
 
 ## Arguments
@@ -14,11 +13,6 @@ test_cox_glmnet(x_test, y_test, training_result)
 - x_test:
 
   A matrix or data frame of predictor variables for the test set.
-
-- y_test:
-
-  A data frame or matrix containing survival information. Must include
-  columns `overall_survival` (time) and `status` (event).
 
 - training_result:
 
@@ -31,10 +25,11 @@ test_cox_glmnet(x_test, y_test, training_result)
 
 ## Value
 
-A named list containing:
+A list with predictions: `pred`: A matrix of predicted risk scores
+(linear predictors) for the test set.
 
-- `pred`: A matrix of predicted risk scores (linear predictors) for the
-  test set.
+## See also
 
-- `cindex`: A numeric value representing the Harrell's Concordance
-  Index.
+[`train_cox_glmnet_LASSO`](https://fracalanca.github.io/Omics2Surv/reference/train_cox_glmnet_LASSO.md),
+[`train_cox_glmnet_ElasticNet`](https://fracalanca.github.io/Omics2Surv/reference/train_cox_glmnet_ElasticNet.md),
+[`train_cox_glmnet_adaptiveLASSO`](https://fracalanca.github.io/Omics2Surv/reference/train_cox_glmnet_adaptiveLASSO.md)

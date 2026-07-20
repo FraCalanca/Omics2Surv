@@ -1,110 +1,83 @@
-# Train Block Random Forest for Survival Analysis
+# Train Block Random Forest for Multi-Omics Survival Analysis
 
-Trains a block random forest model for survival data using the
-blockForest algorithm. Features are organized into blocks based on
-specified prefixes (e.g., clinical, genomic, transcriptomic), allowing
-for structured variable selection and importance ranking.
+Trains a block random forest survival model. Feature blocks are derived
+automatically from the names of `X_list`, prefixing each omic's column
+names. Can be called directly or via
+[`train_j_models`](https://fracalanca.github.io/Omics2Surv/reference/train_j_models.md).
 
 ## Usage
 
 ``` r
 train_blockForest(
-  x_training,
+  X_list,
   y_training,
-  prefixes = NULL,
   threads = 10,
   always.split.variables = NULL,
-  n_top_genes = 100,
-  seed = 8240
+  n_top_features = 100,
+  seed = 123,
+  ...
 )
 ```
 
 ## Arguments
 
-- x_training:
+- X_list:
 
-  A matrix or data frame of training predictors.
+  Named list of omics matrices (samples x features). Names are used to
+  derive block prefixes automatically (e.g. a layer named `"mRNA"` maps
+  to columns starting with `"mRNA_"`). Column names in each matrix must
+  already carry the prefix `"<omic_name>_"` (set automatically by
+  [`train_j_models`](https://fracalanca.github.io/Omics2Surv/reference/train_j_models.md);
+  must be set manually when calling directly).
 
 - y_training:
 
-  A data frame containing survival outcomes with columns:
-
-  - `overall_survival`: Numeric survival time
-
-  - `status`: Numeric event indicator (1 = event, 0 = censored)
-
-- prefixes:
-
-  Character vector of prefixes used to define feature blocks. Each
-  prefix identifies a group of related variables (e.g.,
-  `c("clinical_", "omic1_", "omic2_")`). This parameter is required and
-  must not be NULL.
+  Data frame with `overall_survival` and `status`.
 
 - threads:
 
-  Integer specifying the number of parallel threads to use. Default is
-  10.
+  Integer number of parallel threads. Default is 10.
 
 - always.split.variables:
 
-  Optional list of variable names that should be considered at every
-  split. Useful for forcing important clinical variables to be
-  evaluated. Must be a list; set to NULL to disable. Default is NULL.
+  Optional list of variable names considered at every split. Default is
+  `NULL`.
 
-- n_top_genes:
+- n_top_features:
 
-  Integer specifying the number of top important features to select
-  based on variable importance. Default is 100.
+  Integer number of top important features to return. Default is 100.
 
 - seed:
 
-  Integer seed for reproducibility. Default is 8240.
+  Integer seed. Default is 123.
+
+- ...:
+
+  Additional arguments passed to
+  [`blockForest::blockForest`](https://bips-hb.github.io/blockForest/reference/blockForest.html).
 
 ## Value
 
-A list containing:
+A list with:
 
-- model:
+- `model`: Trained blockForest model.
 
-  The trained blockForest model object.
+- `pred`: Numeric vector of risk scores for training samples.
 
-- cindex:
+- `selected_features`: Top `n_top_features` by impurity.
 
-  Numeric training concordance index (C-index), calculated as 1 -
-  prediction error.
-
-- pred:
-
-  Numeric vector of linear predictors (prognostic scores) for training
-  samples, extracted from the cumulative hazard function.
-
-- selected_features:
-
-  Character vector of the top N most important features based on
-  impurity-based variable importance, where N = `n_top_genes`.
-
-- extra:
-
-  List containing additional information:
-
-  - `variable_importance`: Named numeric vector of importance scores for
-    all features
-
-  - `blocks`: List of feature block indices as defined by prefixes
+- `extra`: List with `variable_importance` and `blocks`.
 
 ## Details
 
-The function performs the following steps:
+Column names are prefixed internally before concatenation so that block
+membership can be recovered from column names. If calling directly
+(without
+[`train_j_models`](https://fracalanca.github.io/Omics2Surv/reference/train_j_models.md)),
+ensure column names in each matrix of `X_list` do not already carry the
+prefix — they will be added here.
 
-1.  Organizes features into blocks based on the specified prefixes
+## See also
 
-2.  Calculates block-specific mtry values using the square root rule:
-    `sqrt(block_size)`
-
-3.  Trains a survival random forest using the logrank splitting rule
-
-4.  Computes variable importance using impurity reduction
-
-5.  Extracts training predictions and performance metrics
-
-6.  Selects top important features for downstream analysis
+[`test_blockForest`](https://fracalanca.github.io/Omics2Surv/reference/test_blockForest.md),
+[`train_j_models`](https://fracalanca.github.io/Omics2Surv/reference/train_j_models.md)

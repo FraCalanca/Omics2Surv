@@ -1,9 +1,9 @@
 # Train Cooperative Learning Model for Multi-Omics Survival Analysis
 
-Trains a cooperative Lasso (CoopLasso) Cox regression model that
-integrates multiple omics datasets for survival prediction. The method
-encourages cooperation between different data modalities while
-performing feature selection through L1 regularization.
+Trains a cooperative Lasso Cox regression model integrating 2 or 3 omics
+layers. An internal validation subset is held out for lambda selection
+via cross-validation. Can be called directly or via
+[`train_j_models`](https://fracalanca.github.io/Omics2Surv/reference/train_j_models.md).
 
 ## Usage
 
@@ -11,6 +11,7 @@ performing feature selection through L1 regularization.
 train_cooplearning(
   X_list,
   y_training,
+  val_fraction = 0.1,
   lambdaVector = seq(0.1, 0.9, 0.1),
   folds = 5,
   alpha = 1,
@@ -23,97 +24,65 @@ train_cooplearning(
 
 - X_list:
 
-  A named list of 2 or 3 omics data matrices or data frames. Each
-  element represents a different omics layer (e.g., transcriptomics,
-  proteomics, methylation). All matrices must have:
-
-  - Samples as rows with matching row names across all omics layers
-
-  - Features as columns
+  Named list of 2 or 3 omics matrices (samples x features). Row names
+  must be sample identifiers, consistent across all layers.
 
 - y_training:
 
-  A data frame containing survival outcomes with:
+  Data frame with `overall_survival` and `status` columns. Row names
+  must match sample identifiers in `X_list`.
 
-  - Row names matching sample identifiers in `X_list`
+- val_fraction:
 
-  - Column `overall_survival`: Numeric survival time
-
-  - Column `status`: Numeric event indicator (1 = event, 0 = censored)
+  Numeric proportion of training samples to hold out as internal
+  validation for lambda selection. Default is `0.1`.
 
 - lambdaVector:
 
-  Numeric vector of lambda values to evaluate during cross-validation.
-  Default is `seq(0.1, 0.9, 0.1)`. Lambda controls the strength of
-  regularization.
+  Numeric vector of lambda values to evaluate. Default is
+  `seq(0.1, 0.9, 0.1)`.
 
 - folds:
 
-  Integer specifying the number of cross-validation folds for lambda
-  selection. Default is 5.
+  Integer number of cross-validation folds. Default is 5.
 
 - alpha:
 
-  Numeric value controlling the agreement between layers. `alpha = 1`
-  for 2 layers, `alpha = 0.5` for 3 layers. Default is 1.
+  Numeric cooperation parameter: 1 for 2 layers, 0.5 for 3. Default is
+  1.
 
 - maxit:
 
-  Integer maximum number of iterations for the optimization algorithm.
-  Default is 100.
+  Integer maximum iterations. Default is 1000.
 
 - seed:
 
-  Integer seed for reproducibility of train/validation split and
-  cross-validation. Default is 123.
+  Integer seed. Default is 123.
 
 ## Value
 
-A list containing:
+A list with:
 
-- model:
+- `model`: Trained cooplasso model.
 
-  The trained cooplasso model object containing coefficient vector `b`
-  and other model parameters.
+- `selected_lambda`: Optimal lambda selected by CV.
 
-- selected_lambda:
+- `selected_features`: Non-zero coefficient feature names.
 
-  Numeric optimal lambda value selected through cross-validation.
+- `pred`: Named numeric vector of risk scores for the full input set
+  (train + internal validation reassembled in original order).
 
-- selected_features:
+- `omics`: Names of omics layers used.
 
-  Character vector of feature names with non-zero coefficients (selected
-  features across all omics layers).
+## References
 
-- pred:
+Hahn G, Prokopenko D, Hecker J, Lutz SM, Mullin K, Sejour L, Hide W,
+Vlachos I, DeSantis S, Tanzi RE, Lange C. Prediction of disease-free
+survival for precision medicine using cooperative learning on multi-omic
+data. *Briefings in Bioinformatics*, 25(4):bbae267, July 2024.
+[doi:10.1093/bib/bbae267](https://doi.org/10.1093/bib/bbae267)
 
-  Numeric vector of risk scores for training samples. Higher values
-  indicate higher risk (shorter predicted survival).
+## See also
 
-- cindex:
-
-  Numeric concordance index (C-index) on training data, calculated with
-  `reverse = TRUE` to account for risk score directionality.
-
-- omics:
-
-  Character vector of omics layer names from the input `X_list`.
-
-## Details
-
-The function performs the following workflow:
-
-1.  Validates input structure (2 or 3 omics layers required)
-
-2.  Aligns samples across all omics layers and survival data using
-    common identifiers
-
-3.  Splits data into training (90\\
-
-4.  Performs k-fold cross-validation to select optimal lambda parameter
-
-5.  Trains final cooperative Lasso model with selected lambda
-
-6.  Computes risk scores and C-index on training data
-
-7.  Identifies selected features with non-zero coefficients
+[`test_cooplearning`](https://fracalanca.github.io/Omics2Surv/reference/test_cooplearning.md),
+[`train_j_models`](https://fracalanca.github.io/Omics2Surv/reference/train_j_models.md)

@@ -1,9 +1,8 @@
 # Train AFT Cooperative Learning Model
 
-Trains an Accelerated Failure Time (AFT) model using cooperative
-learning with two sets of predictors. The function fits a regularized
-survival model across multiple correlation (rho) values and returns
-coefficients, predictions, and performance metrics.
+Trains an Accelerated Failure Time cooperative learning model on exactly
+two omics layers. Called internally by
+[`train_j_models`](https://fracalanca.github.io/Omics2Surv/reference/train_j_models.md).
 
 ## Usage
 
@@ -24,91 +23,58 @@ train_AFTCoop(
 
 - x_training1:
 
-  A matrix or data frame of the first set of training predictors (e.g.,
-  first omic features).
+  Numeric matrix (samples x features) for the first omics layer.
 
 - x_training2:
 
-  A matrix or data frame of the second set of training predictors (e.g.,
-  second omic features).
+  Numeric matrix (samples x features) for the second omics layer.
 
 - y_training:
 
-  A data frame containing survival outcomes with columns:
-
-  - `overall_survival`: Numeric survival time
-
-  - `status`: Numeric event indicator (1 = event, 0 = censored)
+  Data frame with `overall_survival` and `status`.
 
 - model:
 
-  Character string specifying the AFT distribution. Default is
-  "weibull". Other options include "lognormal" and "loglogistic".
+  Character string specifying the AFT distribution: `"weibull"`
+  (default), `"lognormal"`, or `"loglogistic"`.
 
 - rho_values:
 
-  Numeric vector of correlation penalty parameters to evaluate. Default
-  is `c(0.25, 0.5, 0.75)`. Controls the cooperation between the two
-  predictor sets.
+  Numeric vector of cooperation penalty parameters to evaluate. Default
+  is `c(0.25, 0.5, 0.75)`.
 
 - ncore_max_rho:
 
-  Integer specifying the maximum number of cores to use for parallel
-  processing across rho values. Default is 10.
+  Integer maximum cores for parallelisation across rho values. Default
+  is 10.
 
 - ncore_max_cv:
 
-  Integer specifying the maximum number of cores to use for
-  cross-validation. Default is 10.
+  Integer maximum cores for cross-validation. Default is 10.
 
 - seed:
 
-  Integer seed for reproducibility. Default is 123.
+  Integer seed. Default is 123.
 
 ## Value
 
-A list containing:
+A list with:
 
-- final_model_coefs:
+- `final_model_coefs`: Data frame of coefficients (features x rho
+  values).
 
-  Data frame of coefficient estimates for each rho value. Rows
-  correspond to features from both predictor sets, columns to rho
-  values.
+- `sigma_est`: Estimated AFT scale parameter.
 
-- sigma_est:
+- `rho_values`: Rho values used.
 
-  Numeric estimated scale parameter (sigma) from the AFT model.
+- `pred`: Named list of training predictions, one per rho.
 
-- rho_values:
+- `selected_features`: Named list of selected features per rho.
 
-  Numeric vector of rho values used in training (same as input).
+- `mU`, `mZ`: Column means of the two training matrices, used to centre
+  the test set consistently at prediction time.
 
-- pred:
+## See also
 
-  Training set predictions for each rho value.
-
-- cindex:
-
-  Concordance indices (C-index) on training data for each rho value.
-
-- selected_features:
-
-  Named list of selected (non-zero) features for each rho value.
-
-## Details
-
-The function performs the following steps:
-
-1.  Prepares survival data (time, event indicator, log-transformed time)
-
-2.  Estimates the scale parameter (sigma) using
-    [`survival::survreg`](https://rdrr.io/pkg/survival/man/survreg.html)
-
-3.  Fits cooperative AFT models across specified rho values using
-    `aft_coop`
-
-4.  Generates predictions and calculates C-index for each rho value on
-    training data
-
-5.  Identifies selected features (non-zero coefficients) for each rho
-    value
+[`train_j_models`](https://fracalanca.github.io/Omics2Surv/reference/train_j_models.md),
+[`test_AFTCoop`](https://fracalanca.github.io/Omics2Surv/reference/test_AFTCoop.md)

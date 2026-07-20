@@ -12,12 +12,14 @@ train_cox_glmnet_adaptiveLASSO(
   x_training,
   y_training,
   nfolds = 5,
-  optimal_lambda = "minimum",
-  type_measure = "C",
+  optimal_lambda = c("minimum", "1se"),
+  type_measure = c("C", "deviance"),
   unpenalized = NULL,
   system_type = "unix",
-  nlambda = 150,
-  seed = NULL
+  nlambda = 100,
+  gamma = 1,
+  seed = NULL,
+  ...
 )
 ```
 
@@ -42,7 +44,8 @@ train_cox_glmnet_adaptiveLASSO(
 
 - type_measure:
 
-  Character. Loss function for cross-validation (e.g., `"C"`).
+  Character. Loss function for cross-validation: `"C"` (C-index,
+  default) or `"deviance"`.
 
 - unpenalized:
 
@@ -57,9 +60,18 @@ train_cox_glmnet_adaptiveLASSO(
 
   Integer. Number of \\\lambda\\ values for the Ridge step sequence.
 
+- gamma:
+
+  Numeric. Relaxation parameter passed to `glmnet` for the Ridge step.
+  Default is 1.
+
 - seed:
 
   Optional integer for reproducibility.
+
+- ...:
+
+  Additional arguments (currently unused).
 
 ## Value
 
@@ -74,7 +86,5 @@ A named list containing:
 - `selected_features`: Predictors with non-zero coefficients.
 
 - `pred`: Linear predictors for the training set.
-
-- `cindex`: Training set Concordance Index.
 
 - `weights`: The penalty factors derived from the Ridge step.
