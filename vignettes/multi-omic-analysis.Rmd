@@ -15,7 +15,7 @@ knitr::opts_chunk$set(
 )
 ```
 
-```{r setup}
+```{r setup, eval= TRUE}
 library(Omics2Surv)
 ```
 
@@ -417,6 +417,23 @@ plot_enrichment(KIPAN_block, "GO")
 
 ## Session info
 
-```{r}
+```{r, eval=TRUE}
 sessionInfo()
+```
+
+```{r, eval=TRUE, echo=FALSE}
+desc <- packageDescription("Omics2Surv")
+
+imports <- unlist(strsplit(desc$Imports, ",\\s*|\n"))
+imports <- trimws(sub("\\s*\\(.*\\)", "", imports))
+imports <- imports[imports != ""]
+
+installed <- installed.packages()
+
+data.frame(
+  package = imports,
+  version = installed[imports, "Version"],
+  row.names = NULL
+)
+
 ```
