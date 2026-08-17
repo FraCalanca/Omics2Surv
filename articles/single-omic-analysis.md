@@ -451,4 +451,66 @@ plot_enrichment(KIPAN_RNA_en, "GO")
 ``` r
 
 sessionInfo()
+#> R version 4.6.1 (2026-06-24)
+#> Platform: x86_64-pc-linux-gnu
+#> Running under: Ubuntu 24.04.4 LTS
+#> 
+#> Matrix products: default
+#> BLAS:   /usr/lib/x86_64-linux-gnu/openblas-pthread/libblas.so.3 
+#> LAPACK: /usr/lib/x86_64-linux-gnu/openblas-pthread/libopenblasp-r0.3.26.so;  LAPACK version 3.12.0
+#> 
+#> locale:
+#>  [1] LC_CTYPE=C.UTF-8       LC_NUMERIC=C           LC_TIME=C.UTF-8       
+#>  [4] LC_COLLATE=C.UTF-8     LC_MONETARY=C.UTF-8    LC_MESSAGES=C.UTF-8   
+#>  [7] LC_PAPER=C.UTF-8       LC_NAME=C              LC_ADDRESS=C          
+#> [10] LC_TELEPHONE=C         LC_MEASUREMENT=C.UTF-8 LC_IDENTIFICATION=C   
+#> 
+#> time zone: UTC
+#> tzcode source: system (glibc)
+#> 
+#> attached base packages:
+#> [1] stats     graphics  grDevices utils     datasets  methods   base     
+#> 
+#> other attached packages:
+#> [1] Omics2Surv_1.0.0
+#> 
+#> loaded via a namespace (and not attached):
+#>  [1] cli_3.6.6         knitr_1.51        rlang_1.3.0       xfun_0.60        
+#>  [5] otel_0.2.0        textshaping_1.0.5 jsonlite_2.0.0    htmltools_0.5.9  
+#>  [9] ragg_1.5.2        sass_0.4.10       rmarkdown_2.31    grid_4.6.1       
+#> [13] evaluate_1.0.5    jquerylib_0.1.4   fastmap_1.2.0     yaml_2.3.12      
+#> [17] lifecycle_1.0.5   compiler_4.6.1    fs_2.1.0          htmlwidgets_1.6.4
+#> [21] lattice_0.22-9    systemfonts_1.3.2 digest_0.6.39     R6_2.6.1         
+#> [25] splines_4.6.1     bslib_0.12.0      Matrix_1.7-5      tools_4.6.1      
+#> [29] survival_3.8-6    pkgdown_2.2.1     cachem_1.1.0      desc_1.4.3
 ```
+
+    #>                 package version
+    #> 1               methods   4.6.1
+    #> 2          BiocParallel  1.46.0
+    #> 3            doParallel  1.0.17
+    #> 4                 dplyr   1.2.1
+    #> 5               ggplot2   4.0.3
+    #> 6                glmnet     5.0
+    #> 7                   M3C  1.34.0
+    #> 8  MultiAssayExperiment  1.38.0
+    #> 9              parallel   4.6.1
+    #> 10             PCAtools  2.24.0
+    #> 11               penAFT   0.3.2
+    #> 12                readr   2.2.0
+    #> 13            Rdimtools   1.1.4
+    #> 14           reticulate  1.46.0
+    #> 15     RobustRankAggreg   1.2.1
+    #> 16            S4Vectors  0.50.1
+    #> 17 SummarizedExperiment  1.42.0
+    #> 18              survAUC   1.4-0
+    #> 19             survival   3.8-6
+    #> 20         TCGAbiolinks  2.40.0
+    #> 21          blockForest   0.2.7
+    #> 22      clusterProfiler  4.20.0
+    #> 23           enrichplot  1.32.0
+    #> 24         org.Hs.eg.db  3.23.1
+    #> 25             pheatmap  1.0.13
+    #> 26           ReactomePA  1.56.0
+    #> 27            survminer   0.5.2
+    #> 28                 uwot   0.2.4
