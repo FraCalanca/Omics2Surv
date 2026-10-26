@@ -1,6 +1,6 @@
 Package: Omics2Surv
 Title: Integrative survival analysis for multi-omics data
-Version: 1.0.0
+Version: 1.0.1
 Authors@R: c(
     person("Francesca", "Calanca",
     email= "francescacalanca@cnr.it", 
@@ -16,7 +16,7 @@ License: MIT + file LICENSE
 Imports: 
     methods, BiocParallel, doParallel, dplyr, ggplot2, glmnet, M3C,MultiAssayExperiment, parallel, PCAtools, penAFT, readr, 
     Rdimtools,reticulate, RobustRankAggreg, S4Vectors, SummarizedExperiment,survAUC, survival, TCGAbiolinks,
-    blockForest, clusterProfiler, enrichplot, org.Hs.eg.db,pheatmap, ReactomePA, survminer, uwot
+    blockForest, clusterProfiler, enrichplot,pheatmap, ReactomePA, survminer, uwot, caret
 Remotes: 
   angeclau/AFTCoop
 Encoding: UTF-8
@@ -26,5 +26,6 @@ BugReports: https://github.com/FraCalanca/Omics2Surv/issues
 Config/roxygen2/version: 8.0.0
 Suggests: 
     knitr,
-    rmarkdown
+    rmarkdown,
+    org.Hs.eg.db
 VignetteBuilder: knitr

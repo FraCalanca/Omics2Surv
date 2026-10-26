@@ -247,6 +247,289 @@ supervised_screening <- function(
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# Consensus nested cross-validation (cnCV) engine
+# ══════════════════════════════════════════════════════════════════════════════
+
+#' Reduce a list of feature sets to a consensus set, with a tracked fallback
+#'
+#' Internal helper used at both nesting levels of \code{.cncv_screening}.
+#' Tries a strict intersection across all sets first (faithful to the cnCV
+#' paper). If the strict intersection is empty - a real risk with
+#' high-dimensional, small-\code{n} omics data - it falls back to a frequency
+#' threshold instead of failing outright, and reports via \code{warning()}
+#' which of the two modes was actually used, so downstream metadata always
+#' records whether the "pure" consensus held or not.
+#'
+#' @param list_of_sets List of character vectors (one per resample) with the
+#'   feature identifiers selected in that resample.
+#' @param fallback_freq_threshold Numeric in (0, 1]. Minimum fraction of sets
+#'   a feature must appear in to survive the fallback. Only used when the
+#'   strict intersection is empty.
+#' @param level_label Character. Short label identifying which nesting level
+#'   called this helper (e.g. \code{"outer fold 2 / inner"}), used only to
+#'   make warnings informative.
+#'
+#' @return A list with:
+#'   \itemize{
+#'     \item \code{features}: character vector of consensus features (possibly
+#'       empty).
+#'     \item \code{mode_used}: \code{"intersect"} or \code{"frequency_fallback"}.
+#'     \item \code{n_sets}: number of sets that were combined.
+#'   }
+#'
+#' @keywords internal
+#' @noRd
+.consensus_reduce <- function(list_of_sets, fallback_freq_threshold = 0.8, level_label = "") {
+
+  # ── 1. Strict intersection (faithful to the cnCV paper) ──────────────────
+  strict <- Reduce(intersect, list_of_sets)
+
+  if (length(strict) > 0) {
+    return(list(
+      features  = strict,
+      mode_used = "intersect",
+      n_sets    = length(list_of_sets)
+    ))
+  }
+
+  # ── 2. Fallback: the strict intersection is empty ─────────────────────────
+  # This is a known failure mode of strict cnCV consensus on high-dimensional,
+  # small-sample omics data. Rather than stopping, fall back to a frequency
+  # threshold, but surface this loudly via warning() so it is never silent.
+  warning(
+    "Empty strict-intersection consensus",
+    if (nzchar(level_label)) paste0(" (", level_label, ")") else "",
+    " across ", length(list_of_sets), " sets. ",
+    "Falling back to a frequency threshold of >= ", fallback_freq_threshold, "."
+  )
+
+  all_feats <- unique(unlist(list_of_sets))
+  freq <- vapply(
+    all_feats,
+    function(f) mean(vapply(list_of_sets, function(s) f %in% s, logical(1))),
+    numeric(1)
+  )
+  fallback_features <- names(freq)[freq >= fallback_freq_threshold]
+
+  if (length(fallback_features) == 0) {
+    warning(
+      "Frequency fallback (>= ", fallback_freq_threshold, ")",
+      if (nzchar(level_label)) paste0(" (", level_label, ")") else "",
+      " also produced no features. No consensus features at this level."
+    )
+  }
+
+  list(
+    features  = fallback_features,
+    mode_used = "frequency_fallback",
+    n_sets    = length(list_of_sets)
+  )
+}
+
+
+#' Consensus nested cross-validation (cnCV) feature screening
+#'
+#' Internal function implementing consensus nested cross-validation for
+#' feature screening, following Parvandeh et al. (2020, Bioinformatics) and
+#' the \code{insilico/cncv} reference implementation. Unlike the previous
+#' single-level, accuracy-agnostic-but-correlated k-fold scheme, this performs
+#' two properly nested levels of resampling:
+#' \enumerate{
+#'   \item An outer \code{k_outer}-fold split of \code{data}.
+#'   \item For each outer fold, an inner \code{k_inner}-fold split of the
+#'     corresponding outer-training data.
+#' }
+#' \code{screening_func} is run only on inner-training data (a strict subset
+#' of an outer-training set, itself a strict subset of \code{data}), so the
+#' held-out outer folds are never touched by screening. Consensus is taken via
+#' \code{\link{.consensus_reduce}} first across the \code{k_inner} inner
+#' selections (per outer fold), then across the \code{k_outer} outer-level
+#' consensus sets, giving the final \code{consensus_features}. No accuracy or
+#' performance metric is used anywhere in this function to decide which
+#' features survive; predictive performance, if desired, should be evaluated
+#' once downstream, on data never used for screening (i.e. the package's own
+#' held-out test split), using \code{consensus_features} as-is.
+#'
+#' @param data Numeric matrix (features x samples).
+#' @param clinical_data Clinical data matrix (variables x samples). Must
+#'   include a \code{"status"} row when \code{stratified = TRUE}.
+#' @param screening_func Function to call for screening (e.g.
+#'   \code{supervised_screening}), applied identically to both nesting levels.
+#' @param screening_args List of named arguments to pass to
+#'   \code{screening_func} (kept fixed across folds; no hyperparameter tuning
+#'   is performed inside the loops, by design, to keep runtime bounded).
+#' @param k_outer Integer, number of outer folds. Default is 5.
+#' @param k_inner Integer, number of inner folds (created within each outer
+#'   training set). Default is 5.
+#' @param fallback_freq_threshold Numeric in (0, 1]. Frequency threshold used
+#'   only when a strict intersection consensus (at either level) is empty; see
+#'   \code{\link{.consensus_reduce}}. Default is 0.8.
+#' @param seed Integer, seed for fold assignment. Default is 4820.
+#' @param stratified Logical. Stratify both outer and inner folds by survival
+#'   status. Default is \code{TRUE}.
+#'
+#' @return List with:
+#'   \itemize{
+#'     \item \code{consensus_features}: character vector, the final cnCV
+#'       consensus feature set.
+#'     \item \code{final_mode_used}: \code{"intersect"} or
+#'       \code{"frequency_fallback"} - whether the strict paper-faithful
+#'       consensus held at the outer level, or a fallback was needed.
+#'     \item \code{per_outer_consensus}: list (length \code{k_outer}) of
+#'       character vectors, the consensus features found within each outer
+#'       fold's inner loop.
+#'     \item \code{per_outer_mode_used}: character vector (length
+#'       \code{k_outer}) recording, per outer fold, whether the inner-level
+#'       consensus was \code{"intersect"} or \code{"frequency_fallback"}.
+#'   }
+#'
+#' @keywords internal
+#' @noRd
+.cncv_screening <- function(
+    data,
+    clinical_data,
+    screening_func,
+    screening_args,
+    k_outer                 = 5,
+    k_inner                 = 5,
+    fallback_freq_threshold = 0.8,
+    seed                    = 4820,
+    stratified              = TRUE
+) {
+
+  # ── Validate inputs ──────────────────────────────────────────────────────
+  if (ncol(data) < k_outer * k_inner) {
+    stop(
+      "Number of samples (", ncol(data), ") is too small for k_outer (",
+      k_outer, ") x k_inner (", k_inner, ") nesting; reduce k_outer/k_inner."
+    )
+  }
+
+  if (fallback_freq_threshold <= 0 || fallback_freq_threshold > 1) {
+    stop("'fallback_freq_threshold' must be in (0, 1].")
+  }
+
+  sample_ids <- colnames(data)
+
+  # ── Outer fold assignment ─────────────────────────────────────────────────
+  set.seed(seed)
+
+  if (stratified && !is.null(clinical_data)) {
+    outer_folds <- tryCatch({
+      status <- as.numeric(clinical_data["status", sample_ids])
+      caret::createFolds(status, k = k_outer, list = FALSE)
+    }, error = function(e) {
+      warning(
+        "Stratified outer fold assignment failed (", conditionMessage(e),
+        "); falling back to unstratified random folds."
+      )
+      out <- rep(seq_len(k_outer), length.out = ncol(data))
+      out[sample(seq_len(ncol(data)))]
+    })
+  } else {
+    outer_folds <- rep(seq_len(k_outer), length.out = ncol(data))
+    outer_folds <- outer_folds[sample(seq_len(ncol(data)))]
+  }
+
+  message("cnCV screening: ", k_outer, " outer fold(s) x ", k_inner, " inner fold(s)")
+
+  consensus_per_outer <- vector("list", k_outer)
+  outer_mode_used     <- character(k_outer)
+
+  for (i in seq_len(k_outer)) {
+
+    outer_train_idx  <- which(outer_folds != i)
+    outer_train_ids   <- sample_ids[outer_train_idx]
+    outer_train_data <- data[, outer_train_ids, drop = FALSE]
+    outer_train_clin <- clinical_data[, outer_train_ids, drop = FALSE]
+
+    # ── Inner fold assignment (within THIS outer fold's training data only) ──
+    if (stratified && !is.null(clinical_data)) {
+      inner_folds <- tryCatch({
+        inner_status <- as.numeric(outer_train_clin["status", ])
+        caret::createFolds(inner_status, k = k_inner, list = FALSE)
+      }, error = function(e) {
+        warning(
+          "Stratified inner fold assignment failed for outer fold ", i,
+          " (", conditionMessage(e), "); falling back to unstratified random folds."
+        )
+        out <- rep(seq_len(k_inner), length.out = ncol(outer_train_data))
+        out[sample(seq_len(ncol(outer_train_data)))]
+      })
+    } else {
+      inner_folds <- rep(seq_len(k_inner), length.out = ncol(outer_train_data))
+      inner_folds <- inner_folds[sample(seq_len(ncol(outer_train_data)))]
+    }
+
+    inner_selections <- vector("list", k_inner)
+
+    for (j in seq_len(k_inner)) {
+      # Screening is run only on inner-training data: a strict subset of the
+      # outer-training set, which is itself a strict subset of `data`. The
+      # outer fold `i` held-out samples are never seen at this point.
+      inner_train_idx  <- which(inner_folds != j)
+      inner_train_ids  <- colnames(outer_train_data)[inner_train_idx]
+      inner_data <- outer_train_data[, inner_train_ids, drop = FALSE]
+      inner_clin <- outer_train_clin[, inner_train_ids, drop = FALSE]
+
+      result <- do.call(screening_func, c(
+        list(data = inner_data, clinical_data = inner_clin),
+        screening_args
+      ))
+
+      if (is.list(result) && !is.null(result$selected)) {
+        inner_selections[[j]] <- result$selected
+      } else if (is.character(result)) {
+        inner_selections[[j]] <- result
+      } else {
+        stop("Screening function must return a list with $selected or a character vector.")
+      }
+    }
+
+    inner_result <- .consensus_reduce(
+      inner_selections,
+      fallback_freq_threshold = fallback_freq_threshold,
+      level_label             = paste0("outer fold ", i, " / inner")
+    )
+
+    message(
+      "  Outer fold ", i, "/", k_outer, ": inner consensus (", inner_result$mode_used,
+      ") -> ", length(inner_result$features), " feature(s)."
+    )
+
+    consensus_per_outer[[i]] <- inner_result$features
+    outer_mode_used[i]       <- inner_result$mode_used
+  }
+
+  names(consensus_per_outer) <- paste0("Outer_", seq_len(k_outer))
+  names(outer_mode_used)     <- paste0("Outer_", seq_len(k_outer))
+
+  # ── Final consensus across outer folds ────────────────────────────────────
+  outer_result <- .consensus_reduce(
+    consensus_per_outer,
+    fallback_freq_threshold = fallback_freq_threshold,
+    level_label             = "outer (final)"
+  )
+
+  message(
+    "cnCV final consensus (", outer_result$mode_used, "): ",
+    length(outer_result$features), " feature(s)."
+  )
+
+  if (length(outer_result$features) == 0) {
+    warning("cnCV produced zero consensus features. Consider lowering fallback_freq_threshold or k_outer/k_inner.")
+  }
+
+  list(
+    consensus_features  = outer_result$features,
+    final_mode_used      = outer_result$mode_used,
+    per_outer_consensus  = consensus_per_outer,
+    per_outer_mode_used  = outer_mode_used
+  )
+}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # RNA expression wrapper
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -268,6 +551,21 @@ supervised_screening <- function(
 #' @param method Character string for variable screening:
 #'   \code{"supervised"}, \code{"unsupervised"}, \code{"biological"},
 #'   or \code{NULL} (no selection). Default is \code{NULL}.
+#' @param cncv Logical. If \code{TRUE}, feature screening is performed with
+#'   consensus nested cross-validation (cnCV; Parvandeh et al., 2020,
+#'   Bioinformatics, doi:10.1093/bioinformatics/btaa046) instead of a single
+#'   pass on the full data. Two nested levels of resampling are used (outer /
+#'   inner folds); the screening is run only on inner-training data and the
+#'   consensus is taken first across inner folds, then across outer folds.
+#'   Predictive performance is never used to choose features. Requires the
+#'   \pkg{caret} package. Default is \code{FALSE}.
+#' @param k_outer Integer. Number of outer folds (only used if
+#'   \code{cncv = TRUE}). Default is 5.
+#' @param k_inner Integer. Number of inner folds, created within each outer
+#'   training fold (only used if \code{cncv = TRUE}). Default is 5.
+#' @param fallback_freq_threshold Numeric in (0, 1]. Minimum fraction of sets a
+#'   feature must appear in when the strict-intersection consensus is empty at
+#'   a given nesting level (only used if \code{cncv = TRUE}). Default is 0.8.
 #' @param supervised_method Character string specifying the supervised screening
 #'   criterion, passed to \code{\link{supervised_screening}}:
 #'   \itemize{
@@ -309,6 +607,8 @@ supervised_screening <- function(
 #'   computation (\code{unsupervised_method = "laplacian"}). Recommended
 #'   to tune based on sample size, approximately \eqn{\sqrt{n}}.
 #'   Default is \code{NULL}.
+#' @param cv_seed Integer. Seed for fold assignment (only used if
+#'   \code{cncv = TRUE}). Default is 4820.
 #'
 #' @return A \code{SummarizedExperiment} object containing:
 #'   \itemize{
@@ -321,21 +621,32 @@ supervised_screening <- function(
 #'         \item \code{sub_method}: Specific screening criterion used.
 #'         \item \code{n_features}: Number of retained features.
 #'       }
+#'     \item \code{metadata$preprocessing$cncv}: \code{TRUE}/\code{FALSE}. When
+#'       \code{TRUE}, the list also contains \code{k_outer}, \code{k_inner},
+#'       \code{fallback_freq_threshold}, \code{final_mode_used}
+#'       (\code{"intersect"} or \code{"frequency_fallback"} at the final outer
+#'       consensus level), \code{per_outer_consensus} and
+#'       \code{per_outer_mode_used}.
 #'   }
 #'
 #' @export
 prepare_RNA <- function(
     RNA_data,
     clinical_data,
-    q_threshold         = 0.25,
-    method              = NULL,
-    supervised_method   = c("pval", "absmg", "padj", "mgpval"),
-    unsupervised_method = c("A", "MAD", "laplacian"),
-    p_threshold         = 0.05,
-    hvg_threshold       = 25,
-    top_n_features      = NULL,
-    gene_list           = NULL,
-    n_neighbors         = NULL
+    q_threshold             = 0.25,
+    method                  = NULL,
+    cncv                    = FALSE,
+    k_outer                 = 5,
+    k_inner                 = 5,
+    fallback_freq_threshold = 0.8,
+    supervised_method       = c("pval", "absmg", "padj", "mgpval"),
+    unsupervised_method     = c("A", "MAD", "laplacian"),
+    p_threshold             = 0.05,
+    hvg_threshold           = 25,
+    top_n_features          = NULL,
+    gene_list               = NULL,
+    n_neighbors             = NULL,
+    cv_seed                 = 4820
 ) {
 
   # ── Match method arguments ──────────────────────────────────────────────────
@@ -361,7 +672,7 @@ prepare_RNA <- function(
     logical(1)
   )
   RNA_data <- RNA_data[!low_expr, , drop = FALSE]
-  message("features remaining: ", nrow(RNA_data))
+  message("Features remaining: ", nrow(RNA_data))
 
   # ── No additional filtering ──────────────────────────────────────────────
   if (is.null(method)) {
@@ -377,7 +688,87 @@ prepare_RNA <- function(
     return(se)
   }
 
-  # ── Dispatch to screening method ─────────────────────────────────────────
+  # ── cnCV feature screening ────────────────────────────────────────────────
+  if (cncv) {
+    message("Performing consensus nested CV (cnCV) feature screening...")
+
+    if (method == "supervised") {
+      cncv_result <- .cncv_screening(
+        data                    = RNA_data,
+        clinical_data           = clinical_data,
+        screening_func          = supervised_screening,
+        screening_args          = list(
+          rank           = supervised_method,
+          p_threshold    = p_threshold,
+          top_n_features = top_n_features
+        ),
+        k_outer                 = k_outer,
+        k_inner                 = k_inner,
+        fallback_freq_threshold = fallback_freq_threshold,
+        seed                    = cv_seed,
+        stratified              = TRUE
+      )
+    } else if (method == "unsupervised") {
+      cncv_result <- .cncv_screening(
+        data                    = RNA_data,
+        clinical_data           = clinical_data,
+        screening_func          = .cncv_rna_unsupervised_wrapper,
+        screening_args          = list(
+          unsupervised_method = unsupervised_method,
+          hvg_threshold       = hvg_threshold,
+          top_n_features      = top_n_features,
+          n_neighbors         = n_neighbors
+        ),
+        k_outer                 = k_outer,
+        k_inner                 = k_inner,
+        fallback_freq_threshold = fallback_freq_threshold,
+        seed                    = cv_seed,
+        stratified              = TRUE
+      )
+    } else if (method == "biological") {
+      cncv_result <- .cncv_screening(
+        data                    = RNA_data,
+        clinical_data           = clinical_data,
+        screening_func          = biological_screening,
+        screening_args          = list(gene_list = gene_list),
+        k_outer                 = k_outer,
+        k_inner                 = k_inner,
+        fallback_freq_threshold = fallback_freq_threshold,
+        seed                    = cv_seed,
+        stratified              = TRUE
+      )
+    }
+
+    RNA_data <- RNA_data[cncv_result$consensus_features, , drop = FALSE]
+
+    sub_method <- switch(
+      method,
+      supervised   = supervised_method,
+      unsupervised = unsupervised_method,
+      biological   = "gene_list"
+    )
+
+    se <- SummarizedExperiment::SummarizedExperiment(
+      assays   = list(counts = RNA_data),
+      metadata = list(preprocessing = list(
+        omics                   = "RNA",
+        method                  = method,
+        sub_method              = sub_method,
+        n_features              = nrow(RNA_data),
+        cncv                    = TRUE,
+        k_outer                 = k_outer,
+        k_inner                 = k_inner,
+        fallback_freq_threshold = fallback_freq_threshold,
+        final_mode_used         = cncv_result$final_mode_used,
+        per_outer_consensus     = cncv_result$per_outer_consensus,
+        per_outer_mode_used     = cncv_result$per_outer_mode_used
+      ))
+    )
+
+    return(se)
+  }
+
+  # ── Single-pass feature screening (original behavior) ────────────────────
   RNA_data <- switch(
     method,
     supervised = {
@@ -397,7 +788,6 @@ prepare_RNA <- function(
     stop("Invalid method. Choose 'supervised', 'unsupervised', 'biological', or NULL.")
   )
 
-  # ──Build SummarizedExperiment ───────────────────────────────────────────
   sub_method <- switch(
     method,
     supervised   = supervised_method,
@@ -411,11 +801,52 @@ prepare_RNA <- function(
       omics      = "RNA",
       method     = method,
       sub_method = sub_method,
-      n_features    = nrow(RNA_data)
+      n_features = nrow(RNA_data),
+      cncv       = FALSE
     ))
   )
 
   return(se)
+}
+
+
+#' Wrapper for RNA unsupervised screening (for cnCV compatibility)
+#'
+#' Adapts \code{.rna_screen_unsupervised}, which returns a filtered data
+#' matrix, to the \code{list(selected = ...)} interface expected by
+#' \code{\link{.cncv_screening}}'s \code{screening_func} argument.
+#'
+#' @param data Numeric matrix (features x samples), an inner-training subset.
+#' @param clinical_data Present only for interface compatibility with
+#'   \code{\link{.cncv_screening}}; unused by unsupervised screening.
+#' @param unsupervised_method Character. Method for unsupervised screening.
+#' @param hvg_threshold Numeric percentile (0-100).
+#' @param top_n_features Integer or \code{NULL}.
+#' @param n_neighbors Integer or \code{NULL}.
+#'
+#' @return A list with a single element \code{selected}, the character vector
+#'   of feature identifiers retained by \code{.rna_screen_unsupervised}.
+#'
+#' @keywords internal
+#' @noRd
+.cncv_rna_unsupervised_wrapper <- function(
+    data,
+    clinical_data,
+    unsupervised_method,
+    hvg_threshold,
+    top_n_features,
+    n_neighbors
+) {
+
+  result <- .rna_screen_unsupervised(
+    data,
+    unsupervised_method,
+    hvg_threshold,
+    top_n_features,
+    n_neighbors
+  )
+
+  list(selected = rownames(result))
 }
 
 
@@ -508,6 +939,21 @@ prepare_RNA <- function(
 #' @param method Character string for variable screening: \code{"supervised"},
 #'   \code{"unsupervised"}, \code{"biological"}, or \code{NULL} (no selection).
 #'   Default is \code{NULL}.
+#' @param cncv Logical. If \code{TRUE}, feature screening is performed with
+#'   consensus nested cross-validation (cnCV; Parvandeh et al., 2020,
+#'   Bioinformatics, doi:10.1093/bioinformatics/btaa046) instead of a single
+#'   pass on the full data. Two nested levels of resampling are used (outer /
+#'   inner folds); the screening is run only on inner-training data and the
+#'   consensus is taken first across inner folds, then across outer folds.
+#'   Predictive performance is never used to choose features. Requires the
+#'   \pkg{caret} package. Default is \code{FALSE}.
+#' @param k_outer Integer. Number of outer folds (only used if
+#'   \code{cncv = TRUE}). Default is 5.
+#' @param k_inner Integer. Number of inner folds, created within each outer
+#'   training fold (only used if \code{cncv = TRUE}). Default is 5.
+#' @param fallback_freq_threshold Numeric in (0, 1]. Minimum fraction of sets a
+#'   feature must appear in when the strict-intersection consensus is empty at
+#'   a given nesting level (only used if \code{cncv = TRUE}). Default is 0.8.
 #' @param supervised_method Character string specifying the supervised screening
 #'   criterion, passed to \code{\link{supervised_screening}}:
 #'   \itemize{
@@ -539,29 +985,41 @@ prepare_RNA <- function(
 #' @param n_neighbors Integer. Number of neighbors for Laplacian score
 #'   computation (\code{unsupervised_method = "laplacian"}). Defaults to
 #'   \eqn{\approx \sqrt{n}} if \code{NULL}.
+#' @param cv_seed Integer. Seed for fold assignment (only used if
+#'   \code{cncv = TRUE}). Default is 4820.
 #'
 #' @return A \code{SummarizedExperiment} object with:
 #'   \itemize{
 #'     \item \code{assays$counts}: Filtered methylation matrix.
 #'     \item \code{metadata$preprocessing}: List with \code{omics},
 #'       \code{method}, \code{sub_method}, and number of features retained.
+#'     \item \code{metadata$preprocessing$cncv}: \code{TRUE}/\code{FALSE}. When
+#'       \code{TRUE}, the list also contains \code{k_outer}, \code{k_inner},
+#'       \code{fallback_freq_threshold}, \code{final_mode_used}
+#'       (\code{"intersect"} or \code{"frequency_fallback"} at the final outer
+#'       consensus level), \code{per_outer_consensus} and
+#'       \code{per_outer_mode_used}.
 #'   }
 #'
 #' @export
 prepare_methyl <- function(
     methyl_data,
     clinical_data,
-    method              = NULL,
-    supervised_method   = c("pval", "absmg", "padj", "mgpval"),
-    unsupervised_method = c("IQR", "MAD", "laplacian"),
-    p_threshold         = 0.05,
-    hvg_threshold       = 25,
-    top_n_features      = NULL,
-    gene_list           = NULL,
-    n_neighbors         = NULL
+    method                  = NULL,
+    cncv                    = FALSE,
+    k_outer                 = 5,
+    k_inner                 = 5,
+    fallback_freq_threshold = 0.8,
+    supervised_method       = c("pval", "absmg", "padj", "mgpval"),
+    unsupervised_method     = c("IQR", "MAD", "laplacian"),
+    p_threshold             = 0.05,
+    hvg_threshold           = 25,
+    top_n_features          = NULL,
+    gene_list               = NULL,
+    n_neighbors             = NULL,
+    cv_seed                 = 4820
 ) {
 
-  # ── Match method arguments ──────────────────────────────────────────────────
   supervised_method   <- match.arg(supervised_method)
   unsupervised_method <- match.arg(unsupervised_method)
 
@@ -576,7 +1034,7 @@ prepare_methyl <- function(
   clinical_data <- clinical_data[, samples_to_keep, drop = FALSE]
   message("Samples overlapping with clinical data: ", length(samples_to_keep))
 
-  # ──  No additional filtering ──────────────────────────────────────────────
+  # ── No additional filtering ──────────────────────────────────────────────
   if (is.null(method)) {
     message("No additional filtering applied.")
     se <- SummarizedExperiment::SummarizedExperiment(
@@ -590,7 +1048,87 @@ prepare_methyl <- function(
     return(se)
   }
 
-  # ── Dispatch to screening method ─────────────────────────────────────────
+  # ── cnCV feature screening ────────────────────────────────────────────────
+  if (cncv) {
+    message("Performing consensus nested CV (cnCV) feature screening...")
+
+    if (method == "supervised") {
+      cncv_result <- .cncv_screening(
+        data                    = methyl_data,
+        clinical_data           = clinical_data,
+        screening_func          = supervised_screening,
+        screening_args          = list(
+          rank           = supervised_method,
+          p_threshold    = p_threshold,
+          top_n_features = top_n_features
+        ),
+        k_outer                 = k_outer,
+        k_inner                 = k_inner,
+        fallback_freq_threshold = fallback_freq_threshold,
+        seed                    = cv_seed,
+        stratified              = TRUE
+      )
+    } else if (method == "unsupervised") {
+      cncv_result <- .cncv_screening(
+        data                    = methyl_data,
+        clinical_data           = clinical_data,
+        screening_func          = .cncv_methyl_unsupervised_wrapper,
+        screening_args          = list(
+          unsupervised_method = unsupervised_method,
+          hvg_threshold       = hvg_threshold,
+          top_n_features      = top_n_features,
+          n_neighbors         = n_neighbors
+        ),
+        k_outer                 = k_outer,
+        k_inner                 = k_inner,
+        fallback_freq_threshold = fallback_freq_threshold,
+        seed                    = cv_seed,
+        stratified              = TRUE
+      )
+    } else if (method == "biological") {
+      cncv_result <- .cncv_screening(
+        data                    = methyl_data,
+        clinical_data           = clinical_data,
+        screening_func          = biological_screening,
+        screening_args          = list(gene_list = gene_list),
+        k_outer                 = k_outer,
+        k_inner                 = k_inner,
+        fallback_freq_threshold = fallback_freq_threshold,
+        seed                    = cv_seed,
+        stratified              = TRUE
+      )
+    }
+
+    methyl_data <- methyl_data[cncv_result$consensus_features, , drop = FALSE]
+
+    sub_method <- switch(
+      method,
+      supervised   = supervised_method,
+      unsupervised = unsupervised_method,
+      biological   = "gene_list"
+    )
+
+    se <- SummarizedExperiment::SummarizedExperiment(
+      assays   = list(counts = methyl_data),
+      metadata = list(preprocessing = list(
+        omics                   = "methylation",
+        method                  = method,
+        sub_method              = sub_method,
+        n_features              = nrow(methyl_data),
+        cncv                    = TRUE,
+        k_outer                 = k_outer,
+        k_inner                 = k_inner,
+        fallback_freq_threshold = fallback_freq_threshold,
+        final_mode_used         = cncv_result$final_mode_used,
+        per_outer_consensus     = cncv_result$per_outer_consensus,
+        per_outer_mode_used     = cncv_result$per_outer_mode_used
+      ))
+    )
+
+    return(se)
+  }
+
+  # ── Single-pass feature screening ────────────────────────────────────────
   methyl_data <- switch(
     method,
     supervised = {
@@ -610,7 +1148,6 @@ prepare_methyl <- function(
     stop("Invalid method. Choose 'supervised', 'unsupervised', 'biological', or NULL.")
   )
 
-  # ──  Build SummarizedExperiment ───────────────────────────────────────────
   sub_method <- switch(
     method,
     supervised   = supervised_method,
@@ -624,11 +1161,51 @@ prepare_methyl <- function(
       omics      = "methylation",
       method     = method,
       sub_method = sub_method,
-      n_features = nrow(methyl_data)
+      n_features = nrow(methyl_data),
+      cncv       = FALSE
     ))
   )
 
   return(se)
+}
+
+
+#' Wrapper for methylation unsupervised screening (for cnCV compatibility)
+#'
+#' Adapts \code{.methyl_screen_unsupervised} to the \code{list(selected = ...)}
+#' interface expected by \code{\link{.cncv_screening}}'s \code{screening_func}
+#' argument.
+#'
+#' @param data Numeric matrix (features x samples), an inner-training subset.
+#' @param clinical_data Present only for interface compatibility; unused.
+#' @param unsupervised_method Character. Method for unsupervised screening.
+#' @param hvg_threshold Numeric percentile (0-100).
+#' @param top_n_features Integer or \code{NULL}.
+#' @param n_neighbors Integer or \code{NULL}.
+#'
+#' @return A list with a single element \code{selected}, the character vector
+#'   of feature identifiers retained by \code{.methyl_screen_unsupervised}.
+#'
+#' @keywords internal
+#' @noRd
+.cncv_methyl_unsupervised_wrapper <- function(
+    data,
+    clinical_data,
+    unsupervised_method,
+    hvg_threshold,
+    top_n_features,
+    n_neighbors
+) {
+
+  result <- .methyl_screen_unsupervised(
+    data,
+    unsupervised_method,
+    hvg_threshold,
+    top_n_features,
+    n_neighbors
+  )
+
+  list(selected = rownames(result))
 }
 
 
@@ -726,6 +1303,21 @@ prepare_methyl <- function(
 #' @param method Character string for variable screening: \code{"supervised"},
 #'   \code{"unsupervised"}, \code{"biological"}, or \code{NULL} (no selection).
 #'   Default is \code{NULL}.
+#' @param cncv Logical. If \code{TRUE}, feature screening is performed with
+#'   consensus nested cross-validation (cnCV; Parvandeh et al., 2020,
+#'   Bioinformatics, doi:10.1093/bioinformatics/btaa046) instead of a single
+#'   pass on the full data. Two nested levels of resampling are used (outer /
+#'   inner folds); the screening is run only on inner-training data and the
+#'   consensus is taken first across inner folds, then across outer folds.
+#'   Predictive performance is never used to choose features. Requires the
+#'   \pkg{caret} package. Default is \code{FALSE}.
+#' @param k_outer Integer. Number of outer folds (only used if
+#'   \code{cncv = TRUE}). Default is 5.
+#' @param k_inner Integer. Number of inner folds, created within each outer
+#'   training fold (only used if \code{cncv = TRUE}). Default is 5.
+#' @param fallback_freq_threshold Numeric in (0, 1]. Minimum fraction of sets a
+#'   feature must appear in when the strict-intersection consensus is empty at
+#'   a given nesting level (only used if \code{cncv = TRUE}). Default is 0.8.
 #' @param supervised_method Character string specifying the supervised screening
 #'   criterion, passed to \code{\link{supervised_screening}}:
 #'   \itemize{
@@ -769,28 +1361,41 @@ prepare_methyl <- function(
 #'   decides their fate: \code{"drop"} (default) removes them from the object,
 #'   \code{"error"} stops and lists them, \code{"keep"} leaves them in (they stay
 #'   constant).
+#' @param cv_seed Integer. Seed for fold assignment (only used if
+#'   \code{cncv = TRUE}). Default is 4820.
 #'
 #' @return A \code{SummarizedExperiment} object with:
 #'   \itemize{
 #'     \item \code{assays$counts}: Filtered CNV matrix.
 #'     \item \code{metadata$preprocessing}: List with \code{omics},
 #'       \code{method}, \code{sub_method}, and number of features retained.
+#'     \item \code{metadata$preprocessing$cncv}: \code{TRUE}/\code{FALSE}. When
+#'       \code{TRUE}, the list also contains \code{k_outer}, \code{k_inner},
+#'       \code{fallback_freq_threshold}, \code{final_mode_used}
+#'       (\code{"intersect"} or \code{"frequency_fallback"} at the final outer
+#'       consensus level), \code{per_outer_consensus} and
+#'       \code{per_outer_mode_used}.
 #'   }
 #'
 #' @export
 prepare_CNV <- function(
     cnv_data,
     clinical_data,
-    method              = NULL,
-    supervised_method   = c("pval", "absmg", "padj", "mgpval"),
-    unsupervised_method = c("sparsity", "laplacian"),
-    p_threshold         = 0.05,
-    max_zero_fraction   = 0.75,
-    feature_fraction    = 0.25,
-    top_n_features      = NULL,
-    gene_list           = NULL,
-    n_neighbors         = NULL,
-    on_constant         = c("drop", "error", "keep")
+    method                  = NULL,
+    cncv                    = FALSE,
+    k_outer                 = 5,
+    k_inner                 = 5,
+    fallback_freq_threshold = 0.8,
+    supervised_method       = c("pval", "absmg", "padj", "mgpval"),
+    unsupervised_method     = c("sparsity", "laplacian"),
+    p_threshold             = 0.05,
+    max_zero_fraction       = 0.75,
+    feature_fraction        = 0.25,
+    top_n_features          = NULL,
+    gene_list               = NULL,
+    n_neighbors             = NULL,
+    on_constant             = c("drop", "error", "keep"),
+    cv_seed                 = 4820
 ) {
 
   supervised_method   <- match.arg(supervised_method)
@@ -800,6 +1405,7 @@ prepare_CNV <- function(
     method <- match.arg(method, c("supervised", "unsupervised", "biological"))
   }
 
+  # ── 1. Align samples ────────────────────────────────────────────────────────
   samples_to_keep <- intersect(colnames(cnv_data), colnames(clinical_data))
 
   if (length(samples_to_keep) == 0) {
@@ -808,22 +1414,18 @@ prepare_CNV <- function(
 
   cnv_data      <- cnv_data[, samples_to_keep, drop = FALSE]
   clinical_data <- clinical_data[, samples_to_keep, drop = FALSE]
-
   message("Samples overlapping with clinical data: ", length(samples_to_keep))
 
   message("Removing constant features.")
   is_constant <- apply(cnv_data, 1L, function(x) length(unique(x)) == 1L)
   cnv_data    <- cnv_data[!is_constant, , drop = FALSE]
-
   message("Features remaining: ", nrow(cnv_data))
 
-  # Keep the full (post-constant-feature-removal) matrix so the optional coverage
-  # step can add back genes that screening discarded.
-  cnv_full <- cnv_data
+  cnv_full <- cnv_data  # Keep full for coverage repair
 
+  # ── No additional filtering ──────────────────────────────────────────────
   if (is.null(method)) {
     message("No additional filtering applied.")
-
     return(
       SummarizedExperiment::SummarizedExperiment(
         assays = list(counts = cnv_data),
@@ -836,6 +1438,93 @@ prepare_CNV <- function(
     )
   }
 
+  # ── cnCV feature screening ────────────────────────────────────────────────
+  if (cncv) {
+    message("Performing consensus nested CV (cnCV) feature screening...")
+
+    if (method == "supervised") {
+      cncv_result <- .cncv_screening(
+        data                    = cnv_data,
+        clinical_data           = clinical_data,
+        screening_func          = supervised_screening,
+        screening_args          = list(
+          rank           = supervised_method,
+          p_threshold    = p_threshold,
+          top_n_features = top_n_features
+        ),
+        k_outer                 = k_outer,
+        k_inner                 = k_inner,
+        fallback_freq_threshold = fallback_freq_threshold,
+        seed                    = cv_seed,
+        stratified              = TRUE
+      )
+    } else if (method == "unsupervised") {
+      cncv_result <- .cncv_screening(
+        data                    = cnv_data,
+        clinical_data           = clinical_data,
+        screening_func          = .cncv_cnv_unsupervised_wrapper,
+        screening_args          = list(
+          unsupervised_method = unsupervised_method,
+          max_zero_fraction   = max_zero_fraction,
+          feature_fraction    = feature_fraction,
+          top_n_features      = top_n_features,
+          n_neighbors         = n_neighbors
+        ),
+        k_outer                 = k_outer,
+        k_inner                 = k_inner,
+        fallback_freq_threshold = fallback_freq_threshold,
+        seed                    = cv_seed,
+        stratified              = TRUE
+      )
+    } else if (method == "biological") {
+      cncv_result <- .cncv_screening(
+        data                    = cnv_data,
+        clinical_data           = clinical_data,
+        screening_func          = biological_screening,
+        screening_args          = list(gene_list = gene_list),
+        k_outer                 = k_outer,
+        k_inner                 = k_inner,
+        fallback_freq_threshold = fallback_freq_threshold,
+        seed                    = cv_seed,
+        stratified              = TRUE
+      )
+    }
+
+    cnv_data <- cnv_data[cncv_result$consensus_features, , drop = FALSE]
+
+    # Ensure coverage
+    cov           <- .cnv_ensure_coverage(cnv_data, cnv_full, on_constant)
+    cnv_data      <- cov$cnv
+    clinical_data <- clinical_data[, colnames(cnv_data), drop = FALSE]
+
+    sub_method <- switch(
+      method,
+      supervised   = supervised_method,
+      unsupervised = unsupervised_method,
+      biological   = "gene_list"
+    )
+
+    se <- SummarizedExperiment::SummarizedExperiment(
+      assays = list(counts = cnv_data),
+      metadata = list(preprocessing = list(
+        omics                   = "CNV",
+        method                  = method,
+        sub_method              = sub_method,
+        n_features              = nrow(cnv_data),
+        cncv                    = TRUE,
+        k_outer                 = k_outer,
+        k_inner                 = k_inner,
+        fallback_freq_threshold = fallback_freq_threshold,
+        final_mode_used         = cncv_result$final_mode_used,
+        per_outer_consensus     = cncv_result$per_outer_consensus,
+        per_outer_mode_used     = cncv_result$per_outer_mode_used
+      ))
+    )
+
+    return(se)
+  }
+
+  # ── Single-pass feature screening ────────────────────────────────────────
   cnv_data <- switch(
     method,
     supervised = {
@@ -848,7 +1537,6 @@ prepare_CNV <- function(
       )
       result$data
     },
-
     unsupervised = .cnv_screen_unsupervised(
       cnv_data,
       unsupervised_method,
@@ -857,14 +1545,10 @@ prepare_CNV <- function(
       top_n_features,
       n_neighbors
     ),
-
     biological = biological_screening(cnv_data, gene_list)$data,
-
     stop("Invalid method.")
   )
 
-  # Always repair samples made constant by screening, so no patient is silently
-  # dropped downstream.
   cov           <- .cnv_ensure_coverage(cnv_data, cnv_full, on_constant)
   cnv_data      <- cov$cnv
   clinical_data <- clinical_data[, colnames(cnv_data), drop = FALSE]
@@ -876,11 +1560,54 @@ prepare_CNV <- function(
       method     = method,
       sub_method = if (method == "unsupervised")
         unsupervised_method else method,
-      n_features = nrow(cnv_data)
+      n_features = nrow(cnv_data),
+      cncv       = FALSE
     ))
   )
 
   return(se)
+}
+
+
+#' Wrapper for CNV unsupervised screening (for cnCV compatibility)
+#'
+#' Adapts \code{.cnv_screen_unsupervised} to the \code{list(selected = ...)}
+#' interface expected by \code{\link{.cncv_screening}}'s \code{screening_func}
+#' argument.
+#'
+#' @param data Numeric matrix (features x samples), an inner-training subset.
+#' @param clinical_data Present only for interface compatibility; unused.
+#' @param unsupervised_method Character. Method for unsupervised screening.
+#' @param max_zero_fraction Numeric (0-1).
+#' @param feature_fraction Numeric (0-1).
+#' @param top_n_features Integer or \code{NULL}.
+#' @param n_neighbors Integer or \code{NULL}.
+#'
+#' @return A list with a single element \code{selected}, the character vector
+#'   of feature identifiers retained by \code{.cnv_screen_unsupervised}.
+#'
+#' @keywords internal
+#' @noRd
+.cncv_cnv_unsupervised_wrapper <- function(
+    data,
+    clinical_data,
+    unsupervised_method,
+    max_zero_fraction,
+    feature_fraction,
+    top_n_features,
+    n_neighbors
+) {
+
+  result <- .cnv_screen_unsupervised(
+    data,
+    unsupervised_method,
+    max_zero_fraction,
+    feature_fraction,
+    top_n_features,
+    n_neighbors
+  )
+
+  list(selected = rownames(result))
 }
 
 

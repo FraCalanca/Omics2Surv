@@ -8,13 +8,18 @@ prepare_methyl(
   methyl_data,
   clinical_data,
   method = NULL,
+  cncv = FALSE,
+  k_outer = 5,
+  k_inner = 5,
+  fallback_freq_threshold = 0.8,
   supervised_method = c("pval", "absmg", "padj", "mgpval"),
   unsupervised_method = c("IQR", "MAD", "laplacian"),
   p_threshold = 0.05,
   hvg_threshold = 25,
   top_n_features = NULL,
   gene_list = NULL,
-  n_neighbors = NULL
+  n_neighbors = NULL,
+  cv_seed = 4820
 )
 }
 \arguments{
@@ -28,6 +33,25 @@ samples as columns). Must include \code{"overall_survival"} and
 \item{method}{Character string for variable screening: \code{"supervised"},
 \code{"unsupervised"}, \code{"biological"}, or \code{NULL} (no selection).
 Default is \code{NULL}.}
+
+\item{cncv}{Logical. If \code{TRUE}, feature screening is performed with
+consensus nested cross-validation (cnCV; Parvandeh et al., 2020,
+Bioinformatics, doi:10.1093/bioinformatics/btaa046) instead of a single
+pass on the full data. Two nested levels of resampling are used (outer /
+inner folds); the screening is run only on inner-training data and the
+consensus is taken first across inner folds, then across outer folds.
+Predictive performance is never used to choose features. Requires the
+\pkg{caret} package. Default is \code{FALSE}.}
+
+\item{k_outer}{Integer. Number of outer folds (only used if
+\code{cncv = TRUE}). Default is 5.}
+
+\item{k_inner}{Integer. Number of inner folds, created within each outer
+training fold (only used if \code{cncv = TRUE}). Default is 5.}
+
+\item{fallback_freq_threshold}{Numeric in (0, 1]. Minimum fraction of sets a
+feature must appear in when the strict-intersection consensus is empty at
+a given nesting level (only used if \code{cncv = TRUE}). Default is 0.8.}
 
 \item{supervised_method}{Character string specifying the supervised screening
 criterion, passed to \code{\link{supervised_screening}}:
@@ -66,6 +90,9 @@ Used only when \code{method = "biological"}. Default is \code{NULL}.}
 \item{n_neighbors}{Integer. Number of neighbors for Laplacian score
 computation (\code{unsupervised_method = "laplacian"}). Defaults to
 \eqn{\approx \sqrt{n}} if \code{NULL}.}
+
+\item{cv_seed}{Integer. Seed for fold assignment (only used if
+\code{cncv = TRUE}). Default is 4820.}
 }
 \value{
 A \code{SummarizedExperiment} object with:
@@ -73,6 +100,12 @@ A \code{SummarizedExperiment} object with:
 \item \code{assays$counts}: Filtered methylation matrix.
 \item \code{metadata$preprocessing}: List with \code{omics},
 \code{method}, \code{sub_method}, and number of features retained.
+\item \code{metadata$preprocessing$cncv}: \code{TRUE}/\code{FALSE}. When
+\code{TRUE}, the list also contains \code{k_outer}, \code{k_inner},
+\code{fallback_freq_threshold}, \code{final_mode_used}
+(\code{"intersect"} or \code{"frequency_fallback"} at the final outer
+consensus level), \code{per_outer_consensus} and
+\code{per_outer_mode_used}.
 }
 }
 \description{
