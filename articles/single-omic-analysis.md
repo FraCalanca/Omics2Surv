@@ -453,7 +453,7 @@ plot_enrichment(KIPAN_RNA_en, "GO")
 sessionInfo()
 #> R version 4.6.1 (2026-06-24)
 #> Platform: x86_64-pc-linux-gnu
-#> Running under: Ubuntu 24.04.4 LTS
+#> Running under: Ubuntu 24.04.5 LTS
 #> 
 #> Matrix products: default
 #> BLAS:   /usr/lib/x86_64-linux-gnu/openblas-pthread/libblas.so.3 
@@ -472,12 +472,12 @@ sessionInfo()
 #> [1] stats     graphics  grDevices utils     datasets  methods   base     
 #> 
 #> other attached packages:
-#> [1] Omics2Surv_1.0.0
+#> [1] Omics2Surv_1.0.1
 #> 
 #> loaded via a namespace (and not attached):
-#>  [1] cli_3.6.6         knitr_1.51        rlang_1.3.0       xfun_0.60        
+#>  [1] cli_3.6.6         knitr_1.52        rlang_1.3.0       xfun_0.62        
 #>  [5] otel_0.2.0        textshaping_1.0.5 jsonlite_2.0.0    htmltools_0.5.9  
-#>  [9] ragg_1.5.2        sass_0.4.10       rmarkdown_2.31    grid_4.6.1       
+#>  [9] ragg_1.5.2        sass_0.4.10       rmarkdown_2.32    grid_4.6.1       
 #> [13] evaluate_1.0.5    jquerylib_0.1.4   fastmap_1.2.0     yaml_2.3.12      
 #> [17] lifecycle_1.0.5   compiler_4.6.1    fs_2.1.0          htmlwidgets_1.6.4
 #> [21] lattice_0.22-9    systemfonts_1.3.2 digest_0.6.39     R6_2.6.1         
@@ -491,7 +491,7 @@ sessionInfo()
     #> 3            doParallel  1.0.17
     #> 4                 dplyr   1.2.1
     #> 5               ggplot2   4.0.3
-    #> 6                glmnet     5.0
+    #> 6                glmnet     5.1
     #> 7                   M3C  1.34.0
     #> 8  MultiAssayExperiment  1.38.0
     #> 9              parallel   4.6.1
@@ -499,18 +499,18 @@ sessionInfo()
     #> 11               penAFT   0.3.2
     #> 12                readr   2.2.0
     #> 13            Rdimtools   1.1.4
-    #> 14           reticulate  1.46.0
+    #> 14           reticulate  1.47.0
     #> 15     RobustRankAggreg   1.2.1
-    #> 16            S4Vectors  0.50.1
+    #> 16            S4Vectors  0.50.3
     #> 17 SummarizedExperiment  1.42.0
     #> 18              survAUC   1.4-0
     #> 19             survival   3.8-6
     #> 20         TCGAbiolinks  2.40.0
     #> 21          blockForest   0.2.7
-    #> 22      clusterProfiler  4.20.0
-    #> 23           enrichplot  1.32.0
-    #> 24         org.Hs.eg.db  3.23.1
-    #> 25             pheatmap  1.0.13
-    #> 26           ReactomePA  1.56.0
-    #> 27            survminer   0.5.2
-    #> 28                 uwot   0.2.4
+    #> 22      clusterProfiler  4.20.3
+    #> 23           enrichplot  1.32.1
+    #> 24             pheatmap  1.0.13
+    #> 25           ReactomePA  1.56.0
+    #> 26            survminer   0.5.2
+    #> 27                 uwot   0.2.5
+    #> 28                caret   7.0-1

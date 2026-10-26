@@ -11,7 +11,7 @@ optionally performing supervised, unsupervised, or biological variable screening
 
     <a class="navbar-brand me-2" href="../index.html">Omics2Surv</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -53,13 +53,18 @@ optionally performing supervised, unsupervised, or biological variable screening
 <span>  <span class="va">clinical_data</span>,</span>
 <span>  q_threshold <span class="op">=</span> <span class="fl">0.25</span>,</span>
 <span>  method <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  cncv <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  k_outer <span class="op">=</span> <span class="fl">5</span>,</span>
+<span>  k_inner <span class="op">=</span> <span class="fl">5</span>,</span>
+<span>  fallback_freq_threshold <span class="op">=</span> <span class="fl">0.8</span>,</span>
 <span>  supervised_method <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"pval"</span>, <span class="st">"absmg"</span>, <span class="st">"padj"</span>, <span class="st">"mgpval"</span><span class="op">)</span>,</span>
 <span>  unsupervised_method <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"A"</span>, <span class="st">"MAD"</span>, <span class="st">"laplacian"</span><span class="op">)</span>,</span>
 <span>  p_threshold <span class="op">=</span> <span class="fl">0.05</span>,</span>
 <span>  hvg_threshold <span class="op">=</span> <span class="fl">25</span>,</span>
 <span>  top_n_features <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  gene_list <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  n_neighbors <span class="op">=</span> <span class="cn">NULL</span></span>
+<span>  n_neighbors <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  cv_seed <span class="op">=</span> <span class="fl">4820</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -89,6 +94,33 @@ Default is 0.25.</p></dd>
 <dd><p>Character string for variable screening:
 <code>"supervised"</code>, <code>"unsupervised"</code>, <code>"biological"</code>,
 or <code>NULL</code> (no selection). Default is <code>NULL</code>.</p></dd>
+
+
+<dt id="arg-cncv">cncv<a class="anchor" aria-label="anchor" href="#arg-cncv"></a></dt>
+<dd><p>Logical. If <code>TRUE</code>, feature screening is performed with
+consensus nested cross-validation (cnCV; Parvandeh et al., 2020,
+Bioinformatics, doi:10.1093/bioinformatics/btaa046) instead of a single
+pass on the full data. Two nested levels of resampling are used (outer /
+inner folds); the screening is run only on inner-training data and the
+consensus is taken first across inner folds, then across outer folds.
+Predictive performance is never used to choose features. Requires the
+<span class="pkg">caret</span> package. Default is <code>FALSE</code>.</p></dd>
+
+
+<dt id="arg-k-outer">k_outer<a class="anchor" aria-label="anchor" href="#arg-k-outer"></a></dt>
+<dd><p>Integer. Number of outer folds (only used if
+<code>cncv = TRUE</code>). Default is 5.</p></dd>
+
+
+<dt id="arg-k-inner">k_inner<a class="anchor" aria-label="anchor" href="#arg-k-inner"></a></dt>
+<dd><p>Integer. Number of inner folds, created within each outer
+training fold (only used if <code>cncv = TRUE</code>). Default is 5.</p></dd>
+
+
+<dt id="arg-fallback-freq-threshold">fallback_freq_threshold<a class="anchor" aria-label="anchor" href="#arg-fallback-freq-threshold"></a></dt>
+<dd><p>Numeric in (0, 1]. Minimum fraction of sets a
+feature must appear in when the strict-intersection consensus is empty at
+a given nesting level (only used if <code>cncv = TRUE</code>). Default is 0.8.</p></dd>
 
 
 <dt id="arg-supervised-method">supervised_method<a class="anchor" aria-label="anchor" href="#arg-supervised-method"></a></dt>
@@ -146,6 +178,11 @@ computation (<code>unsupervised_method = "laplacian"</code>). Recommended
 to tune based on sample size, approximately \(\sqrt{n}\).
 Default is <code>NULL</code>.</p></dd>
 
+
+<dt id="arg-cv-seed">cv_seed<a class="anchor" aria-label="anchor" href="#arg-cv-seed"></a></dt>
+<dd><p>Integer. Seed for fold assignment (only used if
+<code>cncv = TRUE</code>). Default is 4820.</p></dd>
+
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
@@ -156,6 +193,12 @@ mRNA, miRNA, and other transcriptomic measurements).</p></li>
 <li><p><code>sub_method</code>: Specific screening criterion used.</p></li>
 <li><p><code>n_features</code>: Number of retained features.</p></li>
 </ul></li>
+<li><p><code>metadata$preprocessing$cncv</code>: <code>TRUE</code>/<code>FALSE</code>. When
+<code>TRUE</code>, the list also contains <code>k_outer</code>, <code>k_inner</code>,
+<code>fallback_freq_threshold</code>, <code>final_mode_used</code>
+(<code>"intersect"</code> or <code>"frequency_fallback"</code> at the final outer
+consensus level), <code>per_outer_consensus</code> and
+<code>per_outer_mode_used</code>.</p></li>
 </ul></div>
 
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

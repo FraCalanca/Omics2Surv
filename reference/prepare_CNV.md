@@ -11,6 +11,10 @@ prepare_CNV(
   cnv_data,
   clinical_data,
   method = NULL,
+  cncv = FALSE,
+  k_outer = 5,
+  k_inner = 5,
+  fallback_freq_threshold = 0.8,
   supervised_method = c("pval", "absmg", "padj", "mgpval"),
   unsupervised_method = c("sparsity", "laplacian"),
   p_threshold = 0.05,
@@ -19,7 +23,8 @@ prepare_CNV(
   top_n_features = NULL,
   gene_list = NULL,
   n_neighbors = NULL,
-  on_constant = c("drop", "error", "keep")
+  on_constant = c("drop", "error", "keep"),
+  cv_seed = 4820
 )
 ```
 
@@ -41,6 +46,33 @@ prepare_CNV(
   Character string for variable screening: `"supervised"`,
   `"unsupervised"`, `"biological"`, or `NULL` (no selection). Default is
   `NULL`.
+
+- cncv:
+
+  Logical. If `TRUE`, feature screening is performed with consensus
+  nested cross-validation (cnCV; Parvandeh et al., 2020, Bioinformatics,
+  doi:10.1093/bioinformatics/btaa046) instead of a single pass on the
+  full data. Two nested levels of resampling are used (outer / inner
+  folds); the screening is run only on inner-training data and the
+  consensus is taken first across inner folds, then across outer folds.
+  Predictive performance is never used to choose features. Requires the
+  caret package. Default is `FALSE`.
+
+- k_outer:
+
+  Integer. Number of outer folds (only used if `cncv = TRUE`). Default
+  is 5.
+
+- k_inner:
+
+  Integer. Number of inner folds, created within each outer training
+  fold (only used if `cncv = TRUE`). Default is 5.
+
+- fallback_freq_threshold:
+
+  Numeric in (0, 1\]. Minimum fraction of sets a feature must appear in
+  when the strict-intersection consensus is empty at a given nesting
+  level (only used if `cncv = TRUE`). Default is 0.8.
 
 - supervised_method:
 
@@ -115,6 +147,11 @@ prepare_CNV(
   the object, `"error"` stops and lists them, `"keep"` leaves them in
   (they stay constant).
 
+- cv_seed:
+
+  Integer. Seed for fold assignment (only used if `cncv = TRUE`).
+  Default is 4820.
+
 ## Value
 
 A `SummarizedExperiment` object with:
@@ -123,3 +160,9 @@ A `SummarizedExperiment` object with:
 
 - `metadata$preprocessing`: List with `omics`, `method`, `sub_method`,
   and number of features retained.
+
+- `metadata$preprocessing$cncv`: `TRUE`/`FALSE`. When `TRUE`, the list
+  also contains `k_outer`, `k_inner`, `fallback_freq_threshold`,
+  `final_mode_used` (`"intersect"` or `"frequency_fallback"` at the
+  final outer consensus level), `per_outer_consensus` and
+  `per_outer_mode_used`.
